@@ -115,7 +115,6 @@ class UNet:
 
         self.data_dimensions = segmented_images.shape
         self.dataset = self.createData(images, segmented_images)
-        model_name = save_name
         epoch = 0
 
         if load_dir is not None:
@@ -156,8 +155,6 @@ class UNet:
                                                                                        time.perf_counter() - st))
             st = time.perf_counter()
 
-            #if ep % 30 == 0:
-            #    self._save(save_name, ep)
 
         self._save(save_name, args.total_epochs)
         self.logger.info(f"Finished training the network and save as {save_name+'-epoch'+str(args.total_epochs)+'.pth'}")

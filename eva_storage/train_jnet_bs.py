@@ -1,6 +1,16 @@
+"""
+Train jnet on bs'ed images
+
+
+"""
+
+
+
 import sys
 home_dir = '/home/jbang36/eva_jaeho'
 sys.path.append(home_dir)
+
+
 
 
 

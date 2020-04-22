@@ -1,4 +1,7 @@
+"""
+Train jnet on segmented images, conservative
 
+"""
 
 
 def train_conservative(train_images, preprocess, name):
