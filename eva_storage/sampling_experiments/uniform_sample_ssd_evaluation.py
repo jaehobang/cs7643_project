@@ -217,10 +217,11 @@ if __name__ == "__main__":
         net = net.cuda()
         cudnn.benchmark = True
 
-
+    import time
+    st = time.perf_counter()
     output_dir = get_output_dir('ssd300_uad', set_type)
     box_list = detect_all_boxes(net, test_dataset, output_dir)
-
+    et = time.perf_counter()
 
     write_voc_results_file(box_list, test_dataset)
 
@@ -253,8 +254,12 @@ if __name__ == "__main__":
         score = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
         print(f"key: {key}, score: {score}")
 
+    logger.info(f"Total time taken for evaluating {len(images_us)} is {et - st} (secs)")
+
 
     """Results
+    
+    sampling rate: 30
     
     car, type of key <class 'str'>
     bus, type of key <class 'str'>
@@ -264,7 +269,17 @@ if __name__ == "__main__":
     key: bus, score: 0.7083753784056509
     key: others, score: 0.967398897772258
     key: van, score: 0.6687107040285648
+    04-20-2020 15:42:53 [info:049]INFO : Total time taken for evaluating 430 is 9.831716096028686 (secs)
     
+    
+    sampling rate: 90 (30*3)
+    
+    key: car, score: 0.9254055732360476
+    key: bus, score: 0.600481254366219
+    key: others, score: 0.9720561980905069
+    key: van, score: 0.6319180315143988
+    
+    04-20-2020 15:42:01 [info:049]INFO : Total time taken for evaluating 144 is 4.675174464471638 (secs)
     
     """
 

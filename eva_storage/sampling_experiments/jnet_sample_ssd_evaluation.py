@@ -186,12 +186,18 @@ def propagate_labels(sampled_predicted_labels: dict, mapping):
 if __name__ == "__main__":
 
     loader = UADetracLoader()
-    sampling_rate = 30
+    sampling_rate = 30 ## total number of frames for
 
     images, labels, boxes = load_original_data()
 
     ## let's sample images
-    images_us, labels_us, boxes_us, mapping = sample3(images, labels, boxes, sampling_rate=sampling_rate)
+    images_us, labels_us, boxes_us, mapping = sample3(images, labels, boxes, sampling_rate=sampling_rate) ## basic frame skipping
+
+    ##TODO: insert jnet sampling method here
+    ## we need to train the network or have a saved version of that network, we will be using regular frames...
+
+
+
 
     test_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
     test_dataset.set_images(images_us)
