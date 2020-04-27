@@ -182,10 +182,111 @@ def propagate_labels(sampled_predicted_labels:dict, mapping):
 
     return new_dict
 
+
+
+########### experiments with much more data loaded / evaluated
+
+if __name__ == "__main__":
+
+
+
+    loader = UADetracLoader()
+    ## we assume the skip rate is 15, but in essence, we are performing uniform sampling once every 4 images
+    sampling_rate = 93
+
+    images = loader.load_images(dir = '/nethome/jbang36/eva_jaeho/data/ua_detrac/test_images')
+    labels, boxes = loader.load_labels(dir = '/nethome/jbang36/eva_jaeho/data/ua_detrac/test_xml')
+    labels = labels['vehicle']
+
+    images, labels, boxes = loader.filter_input3(images, labels, boxes)
+
+    ## let's sample images
+    images_us, labels_us, boxes_us, mapping = sample3(images, labels, boxes, sampling_rate = sampling_rate)
+
+
+    test_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
+    test_dataset.set_images(images_us)
+    test_dataset.set_labels(labels_us)
+    test_dataset.set_boxes(boxes_us)
+
+    trained_model = '/nethome/jbang36/eva_jaeho/others/amdegroot/weights/finalists/ssd300_UAD_0408_90000.pth'
+    args.trained_model = trained_model
+    num_classes = len(labelmap) + 1  # +1 for background
+    net = build_ssd('test', 300, num_classes)  # initialize SSD
+    net.load_state_dict(torch.load(args.trained_model))
+    net.eval()
+    logger.info(f"Loaded model {args.trained_model}")
+
+    if args.cuda:
+        net = net.cuda()
+        cudnn.benchmark = True
+
+    import time
+    st = time.perf_counter()
+    output_dir = get_output_dir('ssd300_uad', set_type)
+    box_list = detect_all_boxes(net, test_dataset, output_dir)
+    et = time.perf_counter()
+
+    write_voc_results_file(box_list, test_dataset)
+
+    all_class_recs, nposes = group_annotation_by_class(test_dataset)
+
+
+    image_count = len(images_us)
+    sampled_gt_labels, sampled_predicted_labels = do_python_eval_for_uniform_sampling(all_class_recs, nposes, image_count, output_dir)
+
+    print('hello world')
+    ## need to propagate the labels
+    ## we also need to derive the gt labels for non sampled things....we just need to convert 'labels' to binary format I think
+    ## before we do that let's examine the output of all_gt_labels, all_predicted_labels
+
+    ##TODO: propagate the label and compute precision
+    dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
+    dataset.set_images(images)
+    dataset.set_labels(labels)
+    dataset.set_boxes(boxes)
+
+    ## convert labels format
+    all_gt_labels = convert_labels_to_binary(dataset)
+
+    ## propagate the labels and compute precision
+    sampled_propagated_predicted_labels = propagate_labels(sampled_predicted_labels, mapping)
+
+    from sklearn.metrics import accuracy_score
+
+    for key, value in all_gt_labels.items():
+        score = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        print(f"key: {key}, score: {score}")
+
+    logger.info(f"Total time taken for evaluating {len(images_us)} is {et - st} (secs)")
+
+
+    """
+    sampling_rate 60
+    testing data 937*60 instances
+    
+    key: car, score: 0.9735965958658999
+    key: bus, score: 0.6489931810493706
+    key: others, score: 0.6369220360710025
+    key: van, score: 0.6027382626809337
+    04-22-2020 20:30:24 [info:049]INFO : Total time taken for evaluating 937 is 21.98056793026626 (secs)
+    
+    """
+
+
+
+
+
 ##############################################
 ### Generate numbers for uniform sampling ####
 ##############################################
 
+
+
+
+
+
+"""
 if __name__ == "__main__":
 
 
@@ -255,31 +356,34 @@ if __name__ == "__main__":
         print(f"key: {key}, score: {score}")
 
     logger.info(f"Total time taken for evaluating {len(images_us)} is {et - st} (secs)")
+"""
 
 
-    """Results
-    
-    sampling rate: 30
-    
-    car, type of key <class 'str'>
-    bus, type of key <class 'str'>
-    others, type of key <class 'str'>
-    van, type of key <class 'str'>
-    key: car, score: 0.9268027633315221
-    key: bus, score: 0.7083753784056509
-    key: others, score: 0.967398897772258
-    key: van, score: 0.6687107040285648
-    04-20-2020 15:42:53 [info:049]INFO : Total time taken for evaluating 430 is 9.831716096028686 (secs)
-    
-    
-    sampling rate: 90 (30*3)
-    
-    key: car, score: 0.9254055732360476
-    key: bus, score: 0.600481254366219
-    key: others, score: 0.9720561980905069
-    key: van, score: 0.6319180315143988
-    
-    04-20-2020 15:42:01 [info:049]INFO : Total time taken for evaluating 144 is 4.675174464471638 (secs)
-    
-    """
 
+"""Results
+
+sampling rate: 30
+
+car, type of key <class 'str'>
+bus, type of key <class 'str'>
+others, type of key <class 'str'>
+van, type of key <class 'str'>
+key: car, score: 0.9268027633315221
+key: bus, score: 0.7083753784056509
+key: others, score: 0.967398897772258
+key: van, score: 0.6687107040285648
+04-20-2020 15:42:53 [info:049]INFO : Total time taken for evaluating 430 is 9.831716096028686 (secs)
+
+
+sampling rate: 90 (30*3)
+
+key: car, score: 0.9254055732360476
+key: bus, score: 0.600481254366219
+key: others, score: 0.9720561980905069
+key: van, score: 0.6319180315143988
+
+04-20-2020 15:42:01 [info:049]INFO : Total time taken for evaluating 144 is 4.675174464471638 (secs)
+
+"""
+
+#######################################################################

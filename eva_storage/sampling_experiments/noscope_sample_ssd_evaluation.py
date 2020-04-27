@@ -1,4 +1,9 @@
 """
+We implement no scope functionality and evaluate on ssd
+
+"""
+
+"""
 
 1. Evaluate the accuracy and speed of uniform sampling on SSD for UADetrac dataset
 
@@ -145,7 +150,8 @@ def sample3(images, labels, boxes, sampling_rate=30):
     assert (len(reference_indexes) == len(images))
     return images[::sampling_rate], labels[::sampling_rate], boxes[::sampling_rate], reference_indexes
 
-def sample_jnet(images, labels, boxes, sampling_rate = 30):
+
+def sample_jnet(images, labels, boxes, sampling_rate=30):
     """
     TODO:
 
@@ -157,7 +163,6 @@ def sample_jnet(images, labels, boxes, sampling_rate = 30):
     """
     ## we determine the number of clusters through sampling rate
     cluster_num = len(images) / sampling_rate
-
 
 
 def convert_labels_to_binary(dataset):
@@ -192,9 +197,75 @@ def propagate_labels(sampled_predicted_labels: dict, mapping):
 
     return new_dict
 
+
+def get_rep_indices(images, t_diff, delta_diff):
+    """
+
+    :param images: are already SAMPLED IMAGES -- around 3600 ish
+    :return: representative frames, and mapping so that we can convert from rep frames to all frames
+    """
+    ## TODO: mapping's values should be the indices of the rep_frame it refers to
+    ## we will be using a MSE evaluation method
+    rep_frames_indices = [0]
+    mapping = [0]
+    curr_ref = 0
+
+    for i in range(0, len(images) - 1, t_diff):
+        mse_error = np.square(np.subtract(images[i], images[i+1])).mean()
+        if mse_error > delta_diff:
+            rep_frames_indices.append(i+1)
+            curr_ref += 1
+            mapping.append(curr_ref)
+        else:
+            mapping.append(curr_ref)
+
+    assert(len(mapping) == len(images))
+    rep_frames_indices = np.array(rep_frames_indices)
+    return rep_frames_indices, mapping
+
+
+
+
+
+def sample3(images, labels, boxes, sampling_rate = 30):
+    ## for uniform sampling, we will say all the frames until the next selected from is it's 'property'
+    reference_indexes = []
+    length = len(images[::sampling_rate])
+
+    for i in range(length):
+        for j in range(sampling_rate):
+            if i * sampling_rate + j >= len(images):
+                break
+            reference_indexes.append(i)
+
+    assert(len(reference_indexes) == len(images))
+    return images[::sampling_rate], labels[::sampling_rate], boxes[::sampling_rate], reference_indexes
+
+
+
+def get_final_mapping(mapping, skip_rate, original_image_count):
+    """
+    We need this function because we apply the difference detector after skipping frames, so the mapping is from
+    :param mapping:
+    :param skip_rate:
+    :param original_image_count:
+    :return:
+    """
+    final_mapping = np.zeros(original_image_count)
+    for i in range(original_image_count):
+        if (i // skip_rate) >= len(mapping):
+            print(i, skip_rate, len(mapping))
+            print("--------------")
+        else:
+            final_mapping[i] = mapping[i // skip_rate]
+    return final_mapping
+
+
 #########
 ####### New run script
 #######
+
+
 
 if __name__ == "__main__":
     import os
@@ -202,39 +273,37 @@ if __name__ == "__main__":
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     loader = UADetracLoader()
     skip_rate = 15
-    sampling_rate = 6
+    ## we are not sure how many frames we will evaluate, but diff detection should return True or False as to whether we should evaluate
 
+
+    t_diff = 1 ##TODO: we need to experiment with this as well but since we have skip_rate of 15, I think it will be okay
+    delta_diff = 60  ##TODO: we need to modify this parameter (experiments in NoScope is probably using normalized images
 
     images = loader.load_images(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_images')
     labels, boxes = loader.load_labels(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_xml')
     labels = labels['vehicle']
 
     images, labels, boxes = loader.filter_input3(images, labels, boxes)
-    images = images[:20000]
-    labels = labels[:20000]
-    boxes = boxes[:20000]
 
+    ### we skip frames
+
+    images_us = images[::skip_rate]
+    labels_us = labels[::skip_rate]
+    boxes_us = boxes[::skip_rate]
+    # convert to np arrays to do index slicing
+    labels_us = np.array(labels_us)
+    boxes_us = np.array(boxes_us)
 
     image_count = len(images)
-    cluster_count = image_count // (skip_rate * sampling_rate)
-    images = images.astype(np.uint8)
+    assert(images_us.dtype == np.uint8)
 
+    rep_indices, mapping = get_rep_indices(images_us, t_diff, delta_diff)
+    rep_images = images_us[rep_indices]
+    rep_labels = labels_us[rep_indices]
+    rep_boxes = boxes_us[rep_indices]
 
-    from eva_storage.UNet import UNet
-    network = UNet()
-    images_compressed, _ = network.execute(images, load_dir = '/nethome/jbang36/eva_jaeho/data/models/unet_plain_0423-epoch60.pth')
-
-
-    from eva_storage.clusterModule import ClusterModule
-    cluster_module = ClusterModule()
-    _, rep_indices, all_cluster_labels = cluster_module.run(images_compressed, number_of_clusters = cluster_count)
-    ## we need to get rep labels, rep_boxes as well
-    rep_images = images[rep_indices]
-    rep_labels = np.array(labels)[rep_indices]
-    rep_boxes = np.array(boxes)[rep_indices]
-
-    mapping = cluster_module.get_mapping(rep_indices, all_cluster_labels)
-    mapping = mapping.astype(np.int)
+    final_mapping = get_final_mapping(mapping, skip_rate, len(images))
+    final_mapping = final_mapping.astype(np.int)
 
     ## now we have rep_frames, and we also have mappings
 
@@ -242,6 +311,7 @@ if __name__ == "__main__":
     test_dataset.set_images(rep_images)
     test_dataset.set_labels(rep_labels)
     test_dataset.set_boxes(rep_boxes)
+
 
     trained_model = '/nethome/jbang36/eva_jaeho/others/amdegroot/weights/finalists/ssd300_UAD_0408_90000.pth'
     args.trained_model = trained_model
@@ -281,7 +351,7 @@ if __name__ == "__main__":
     all_gt_labels = convert_labels_to_binary(dataset)
 
     ## propagate the labels and compute precision
-    sampled_propagated_predicted_labels = propagate_labels(sampled_predicted_labels, mapping)
+    sampled_propagated_predicted_labels = propagate_labels(sampled_predicted_labels, final_mapping)
 
     from sklearn.metrics import accuracy_score
 
@@ -290,95 +360,14 @@ if __name__ == "__main__":
         print(f"key: {key}, score: {score}")
 
 
-
-##############################################
-### Generate numbers for uniform sampling ####
-##############################################
 """
-if __name__ == "__main__":
-
-    loader = UADetracLoader()
-    sampling_rate = 15 ## total number of frames for
-
-    images, labels, boxes = load_original_data()
-
-    ## let's sample images
-    images_us, labels_us, boxes_us, mapping = sample3(images, labels, boxes, sampling_rate=sampling_rate) ## basic frame skipping
-
-    ##TODO: insert jnet sampling method here
-    ## we need to train the network or have a saved version of that network, we will be using regular frames...
-    
-
-
-
-    test_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
-    test_dataset.set_images(images_us)
-    test_dataset.set_labels(labels_us)
-    test_dataset.set_boxes(boxes_us)
-
-    trained_model = '/nethome/jbang36/eva_jaeho/others/amdegroot/weights/finalists/ssd300_UAD_0408_90000.pth'
-    args.trained_model = trained_model
-    num_classes = len(labelmap) + 1  # +1 for background
-    net = build_ssd('test', 300, num_classes)  # initialize SSD
-    net.load_state_dict(torch.load(args.trained_model))
-    net.eval()
-    logger.info(f"Loaded model {args.trained_model}")
-
-    if args.cuda:
-        net = net.cuda()
-        cudnn.benchmark = True
-
-    output_dir = get_output_dir('ssd300_uad', set_type)
-    box_list = detect_all_boxes(net, test_dataset, output_dir)
-
-    write_voc_results_file(box_list, test_dataset)
-
-    all_class_recs, nposes = group_annotation_by_class(test_dataset)
-
-    image_count = len(images_us)
-    sampled_gt_labels, sampled_predicted_labels = do_python_eval_for_uniform_sampling(all_class_recs, nposes,
-                                                                                      image_count, output_dir)
-
-    print('hello world')
-    ## need to propagate the labels
-    ## we also need to derive the gt labels for non sampled things....we just need to convert 'labels' to binary format I think
-    ## before we do that let's examine the output of all_gt_labels, all_predicted_labels
-
-    ##TODO: propagate the label and compute precision
-    dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
-    dataset.set_images(images)
-    dataset.set_labels(labels)
-    dataset.set_boxes(boxes)
-
-    ## convert labels format
-    all_gt_labels = convert_labels_to_binary(dataset)
-
-    ## propagate the labels and compute precision
-    sampled_propagated_predicted_labels = propagate_labels(sampled_predicted_labels, mapping)
-
-    from sklearn.metrics import accuracy_score
-
-    for key, value in all_gt_labels.items():
-        score = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
-        print(f"key: {key}, score: {score}")
-
+RESULTS:
+car, type of key <class 'str'>
+bus, type of key <class 'str'>
+others, type of key <class 'str'>
+van, type of key <class 'str'>
+key: car, score: 0.9891395303291969
+key: bus, score: 0.5857175921804618
+key: others, score: 0.5655278010219524
+key: van, score: 0.5822636067441737
 """
-"""Results
-
-skip: 15, sample: 4
-key: car, score: 0.8558940303024908
-key: bus, score: 0.47688144284010187
-key: others, score: 0.7077821496608329
-key: van, score: 0.5417237879893888
-
-
-skip: 15, sample:6
-
-key: car, score: 0.8136806309754838
-key: bus, score: 0.47095269464276174
-key: others, score: 0.706251001477736
-key: van, score: 0.5176883223244966
-
-"""
-
-

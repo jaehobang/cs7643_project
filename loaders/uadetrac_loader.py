@@ -194,7 +194,7 @@ class UADetracLoader(AbstractLoader):
                 count += 1
 
         new_images_train = np.ndarray(
-            shape=(count, images_train.shape[1], images_train.shape[2], images_train.shape[3]))
+            shape=(count, images_train.shape[1], images_train.shape[2], images_train.shape[3]), dtype = np.uint8)
         new_labels_train = []
         new_boxes_train = []
 

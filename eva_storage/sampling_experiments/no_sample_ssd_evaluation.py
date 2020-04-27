@@ -186,9 +186,12 @@ def propagate_labels(sampled_predicted_labels: dict, mapping):
 if __name__ == "__main__":
 
     loader = UADetracLoader()
-    sampling_rate = 30
 
-    images, labels, boxes = load_original_data()
+    images = loader.load_images(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_images')
+    labels, boxes = loader.load_labels(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_xml')
+    labels = labels['vehicle']
+
+    images, labels, boxes = loader.filter_input3(images, labels, boxes)
 
     ## let's sample images
     #images_us, labels_us, boxes_us, mapping = sample3(images, labels, boxes, sampling_rate=sampling_rate)
@@ -237,7 +240,16 @@ if __name__ == "__main__":
         score = accuracy_score(all_gt_labels[key], predicted_labels[key])
         print(f"key: {key}, score: {score}")
 
-    """Results
+    """
+    Results
+    key: car, score: 0.9643206865241156
+    key: bus, score: 0.6459308846831769
+    key: others, score: 0.6485124717360727
+    key: van, score: 0.6320081186461801
+    
+    
+    
+    Results
 
     dict_keys(['car', 'bus', 'others', 'van'])
     dict_keys(['car', 'bus', 'others', 'van'])

@@ -48,14 +48,11 @@ class UNet:
 
     def createDataExecute(self, images:np.ndarray, batch_size = args.batch_size):
         assert(images.dtype == np.uint8)
-        images_normalized = np.copy(images)
-        images_normalized = images_normalized.astype(np.float)
+        images = images.astype(np.float32)
+        images /= 255.0
+        images = np.transpose(images, (0, 3, 1, 2))
 
-        images_normalized /= 255.0
-        train_data = torch.from_numpy(images_normalized).float()
-        train_data = train_data.permute(0, 3, 1, 2)
-
-        return torch.utils.data.DataLoader(train_data, batch_size=batch_size, shuffle=False, num_workers=4)
+        return torch.utils.data.DataLoader(images, batch_size=batch_size, shuffle=False, num_workers=4)
 
 
     def createData(self, images:np.ndarray, segmented_images:np.ndarray, batch_size = args.batch_size):
@@ -70,21 +67,16 @@ class UNet:
         assert(images.dtype == np.uint8)
         assert(segmented_images.dtype == np.uint8)
 
-        images_normalized = np.copy(images)
-        images_normalized = images_normalized.astype(np.float)
-        segmented_normalized = np.copy(segmented_images)
-        segmented_normalized = segmented_normalized.astype(np.float)
+        images_normalized = images.astype(np.float32)
+        images_normalized = (images_normalized / 255.0)
+        segmented_normalized = segmented_images.astype(np.float32)
+        segmented_normalized = (segmented_normalized / 255.0)
+        segmented_normalized = np.expand_dims(segmented_normalized, axis = 3)
 
-        images_normalized /= 255.0
-        train_data = torch.from_numpy(images_normalized).float()
-        train_data = train_data.permute(0,3,1,2)
+        data = np.concatenate((images_normalized, segmented_normalized), axis = 3)
+        data = np.transpose(data, (0,3,1,2))
 
-        segmented_normalized /= 255.0
-        seg_data = torch.from_numpy(segmented_normalized).float()
-        seg_data = seg_data.unsqueeze_(-1)
-        seg_data = seg_data.permute(0,3,1,2)
-
-        return torch.utils.data.DataLoader(torch.cat((train_data, seg_data), dim = 1), batch_size = batch_size, shuffle = False, num_workers = 4)
+        return torch.utils.data.DataLoader(data, batch_size = batch_size, shuffle = False, num_workers = 4)
 
 
     def _parse_dir(self, directory_string):
@@ -239,8 +231,8 @@ class UNet:
         else:
             self.logger.info("Images are given, creating dataset object and executing...    ")
             dataset = self.createDataExecute(images)
-            seg_data = np.ndarray(shape=(images.shape[0], images.shape[1], images.shape[2]))
-            compressed_data = np.ndarray(shape=(images.shape[0], args.compressed_size))
+            seg_data = np.ndarray(shape=(images.shape[0], images.shape[1], images.shape[2]), dtype = np.uint8)
+            compressed_data = np.ndarray(shape=(images.shape[0], args.compressed_size), dtype = np.uint8)
             self.logger.debug(f"Seg data projected shape {seg_data.shape}")
             self.logger.debug(f"Compressed data projected shape {compressed_data.shape}")
             for i, images_ in enumerate(dataset):

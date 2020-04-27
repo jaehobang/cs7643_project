@@ -1,6 +1,10 @@
 """
 Train jnet on original train images -- 4/20/2020 is used for jnet sampling evaluation
 """
+import sys
+
+home_dir = '/home/jbang36/eva_jaeho'
+sys.path.append(home_dir)
 
 
 def train_conservative(train_images, preprocess, name):
@@ -29,7 +33,8 @@ if __name__ == "__main__":
 
     st = time.time()
     # 1. Load the images (cached images is fine)
-    train_images = loader.load_cached_images(name = 'uad_train_images.npy', vi_name = 'uad_train_vi.npy')
+    #train_images = loader.load_cached_images(name = 'uad_train_images.npy', vi_name = 'uad_train_vi.npy')
+    train_images = loader.load_images(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_images')
 
     logger.info(f"Done loading images in {time.time() - st} (sec)")
 
@@ -45,7 +50,7 @@ if __name__ == "__main__":
                    'history20_dist2thresh300_bloat_lvl3',
                    'history20_dist2thresh300_bloat_lvl4']
     """
-    model_name = 'unet_plain'
+    model_name = 'unet_plain_0423'
 
     ## this is needed because we only have segmented images and don't have the primary network saved
 
@@ -53,7 +58,9 @@ if __name__ == "__main__":
     ## train the models
     import numpy as np
 
+    train_images = train_images[::15]
     train_images_avg = np.mean(train_images, axis = 3)
+    train_images_avg = train_images_avg.astype(np.uint8)
     logger.info(f"train_images_avg shape is {train_images_avg.shape}")
 
 
