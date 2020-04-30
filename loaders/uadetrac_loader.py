@@ -184,7 +184,7 @@ class UADetracLoader(AbstractLoader):
 
     ##### Updated 3/3/2020 -- Filters the image input because the loaded data can contain None
 
-    def filter_input3(self, images_train, labels_train, boxes_train):
+    def filter_input3(self, images_train, labels_train, boxes_train, vi_train = None):
         length = len(images_train)
 
         ## first determine count of non None frame
@@ -197,19 +197,32 @@ class UADetracLoader(AbstractLoader):
             shape=(count, images_train.shape[1], images_train.shape[2], images_train.shape[3]), dtype = np.uint8)
         new_labels_train = []
         new_boxes_train = []
-
+        if vi_train is not None:
+            new_vi = np.copy(vi_train)
         index = 0
+
         for i, elem in enumerate(labels_train):
             if elem is not None:
                 new_images_train[index] = images_train[i]
                 index += 1
                 new_labels_train.append(elem)
                 new_boxes_train.append(boxes_train[i])
+            else:
+                if vi_train is not None:
+                    ## this means there is no annotation
+                    ## since we will be skipping that frame, we need to decrease the element by 1
+                    for j in range(len(new_vi)):
+                        if new_vi[j] >= i:
+                            new_vi[j] -= 1
+
 
         assert (len(new_images_train) == len(new_labels_train))
         assert (len(new_images_train) == len(new_boxes_train))
 
-        return new_images_train, new_labels_train, new_boxes_train
+        if vi_train is None:
+            return new_images_train, new_labels_train, new_boxes_train
+        else:
+            return new_images_train, new_labels_train, new_boxes_train, new_vi
 
 
     def filter_input(self, labels_train, boxes_train):
