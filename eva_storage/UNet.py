@@ -17,6 +17,8 @@ import torch.utils.data
 import torch.nn as nn
 import argparse
 import config
+import cv2
+import torch.utils.data as data
 
 
 parser = argparse.ArgumentParser(description='Define arguments for loader')
@@ -27,6 +29,123 @@ parser.add_argument('--batch_size', type = int, default = 64, help='Batch size u
 parser.add_argument('--compressed_size', type = int, default = 100, help='Number of features the compressed image format has')
 parser.add_argument('--checkpoint_name', type = str, default = 'unet_uadetrac', help='name of the file that will be used to save checkpoints')
 args = parser.parse_args()
+
+
+
+
+
+class UnetTransform:
+    """
+        BaseTransofrm will perform the following operations:
+        1. Avg -- convert the image to grayscale
+        2. Normalize -- arrange all pixel values to be between 0 and 1
+        3. Resize -- resize the images to fit the network specifications
+    """
+    def __init__(self, size):
+        self.size = size
+
+    def transform(self, image, mean):
+        size = self.size
+        x = cv2.resize(image, (size, size)).astype(np.float32)
+        x -= mean
+        x = x.astype(np.float32)
+        y = np.copy(x)
+        y = np.mean(y, axis=2)
+
+        ## we need a transform for the output as well
+        ## make the base_transform return 2 different objects
+
+        return x, y
+
+    def __call__(self, image, mean):
+        self.mean = np.array(mean, dtype=np.float32)
+        return self.transform(image, self.size, self.mean)
+
+
+
+
+class UADUNet(data.Dataset):
+    """`MS Coco Detection <http://mscoco.org/dataset/#detections-challenge2016>`_ Dataset.
+    Args:
+        root (string): Root directory where images are downloaded to.
+        set_name (string): Name of the specific set of COCO images.
+        transform (callable, optional): A function/transform that augments the
+                                        raw images`
+        target_transform (callable, optional): A function/transform that takes
+        in the target (bbox) and transforms it.
+    """
+
+    def __init__(self, transform=None, dataset_name='UA-DETRAC', eval = False):
+
+        self.transform = transform
+        self.name = dataset_name
+
+        self.root = ""
+        self.image_width = -1
+        self.image_height = -1
+        self.logger = Logger()
+        self.eval = eval
+
+
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+        Returns:
+            tuple: Tuple (image, target).
+                   target is the object returned by ``coco.loadAnns``.
+        """
+        image_input, image_output = self.pull_item(index)
+        return image_input, image_output
+
+
+    def set_images(self, images):
+        self.X_train = images
+        self.image_width = self.X_train.shape[1]
+        self.image_height = self.X_train.shape[2]
+        self.mean = np.mean(self.X_train, axis = (0,1,2))
+
+    def pull_item(self, index):
+        """
+        Args:
+            index (int): Index
+        Returns:
+            tuple: Tuple (image, target, height, width).
+                   target is the object returned by ``coco.loadAnns``.
+        """
+        img = self.X_train[index]
+        if self.transform is not None:
+            ## we expect this code to run only if target_trans
+            img, target = self.transform(img, self.mean)
+
+        return torch.from_numpy(img).permute(2, 0, 1), torch.from_numpy(target)
+
+
+    def pull_image(self, index):
+        '''Returns the original image object at index in PIL form
+
+        Note: not using self.__getitem__(), as any transformations passed in
+        could mess up this functionality.
+
+        Argument:
+            index (int): index of img to show
+        Return:
+            cv2 img
+        '''
+        return self.X_train[index] ## note this images is BRG
+
+    def __repr__(self):
+        fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
+        fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())
+        fmt_str += '    Root Location: {}\n'.format(self.root)
+        tmp = '    Transforms (if any): '
+        fmt_str += '{0}{1}\n'.format(tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
+        return fmt_str
+
+    def __len__(self):
+        return len(self.X_train)
+
+### TODO: Need to fix the train / execute methods!!!
 
 
 class UNet:
