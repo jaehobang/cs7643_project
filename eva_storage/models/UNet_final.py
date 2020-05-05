@@ -26,6 +26,7 @@ class UNet_final(nn.Module):
         self.create_central(input_shape)
         self.create_decoder_b()
 
+
     def forward(self, x):
         x1 = self.u_enc1(x)
         x2 = self.u_enc2(x1)

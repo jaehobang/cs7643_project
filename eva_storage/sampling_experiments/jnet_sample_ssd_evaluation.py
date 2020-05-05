@@ -222,7 +222,7 @@ if __name__ == "__main__":
 
     from eva_storage.UNet import UNet
     network = UNet()
-    images_compressed, _ = network.execute(images, load_dir = '/nethome/jbang36/eva_jaeho/data/models/unet_plain_0423-epoch60.pth')
+    images_compressed, _ = network.execute(images, load_dir = '/nethome/jbang36/eva_jaeho/data/models/unet_plain_testdata_0430-epoch60.pth')
 
 
     from eva_storage.clusterModule import ClusterModule

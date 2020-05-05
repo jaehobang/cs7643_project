@@ -40,34 +40,18 @@ if __name__ == "__main__":
 
 
     directory_begin = '/nethome/jbang36/eva_jaeho/data/models/plain'
-    """
-    model_names = ['history20_dist2thresh300',
-                   'history20_dist2thresh300_bloat_lvl2',
-                   'history20_dist2thresh300_bloat_lvl3',
-                   'history20_dist2thresh300_bloat_lvl4']
 
-    model_names = ['history20_dist2thresh300_bloat_lvl2',
-                   'history20_dist2thresh300_bloat_lvl3',
-                   'history20_dist2thresh300_bloat_lvl4']
-    """
-    model_name = 'unet_plain_0423'
+    model_name = 'unet_plain_testdata_0504'
 
-    ## this is needed because we only have segmented images and don't have the primary network saved
 
 
     ## train the models
     import numpy as np
 
-    train_images = train_images[::15]
-    train_images_avg = np.mean(train_images, axis = 3)
-    train_images_avg = train_images_avg.astype(np.uint8)
-    logger.info(f"train_images_avg shape is {train_images_avg.shape}")
-
-
-    train_images_avg = train_images_avg.astype(np.uint8)
+    #train_images = train_images[::15]
 
     level_model = UNet()
     ## TODO: because the UNet_final takes in 1 channel as output, we are creating the network to learn a black and white image of the original image
     st = time.perf_counter()
-    level_model.train(train_images, train_images_avg, model_name)
+    level_model.train(train_images, None, model_name)
     logger.info(f"Total time to train the network is {time.perf_counter() - st} (sec)")
