@@ -117,6 +117,25 @@ def load_dec(model_name, cluster_num):
     return model
 
 
+def predict_wrapper(images:np.ndarray, labels, model, cuda = True):
+    ## give it images and will generate the cluster labels for them
+    image_size = images.shape[1]
+    reshape_rate = int(np.ceil(image_size / 28))
+    images_reshaped = images[:, ::reshape_rate, ::reshape_rate, :]
+    images_reshaped = np.mean(images_reshaped, axis=3) ## we need to make it one channel -- this will be okay because the images is 28x28
+    images_reshaped = images_reshaped.astype(np.uint8)
+    assert (images_reshaped.shape[1] == 28)
+    assert (images_reshaped.shape[2] == 28)
+
+    dataset = CachedUAD()
+    dataset.set_images(images_reshaped)
+    dataset.set_labels(labels)
+
+    predicted = predict(dataset, model, 1024, silent=True, return_actual=False, cuda=cuda)
+    ## convert this to numpy
+    return predicted.numpy()
+
+
 
 if __name__ == '__main__':
     import os

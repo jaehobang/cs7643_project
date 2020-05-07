@@ -236,6 +236,8 @@ def detect_all_boxes(net, dataset, output_dir):
 
     for i in range(num_images):
         im, gt, h, w = dataset.pull_item(i)
+        ### annotation might not be available
+
 
         x = Variable(im.unsqueeze(0))
         if args.cuda:
