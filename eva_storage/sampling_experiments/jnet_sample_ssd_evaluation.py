@@ -11,6 +11,7 @@ from logger import Logger
 from others.amdegroot.eval_uad2 import *  ## we import all the functions from here and perform our own evaluation
 from others.amdegroot.data.uad import UAD_ROOT, UADAnnotationTransform, UADDetection
 from others.amdegroot.data.uad import UAD_CLASSES as labelmap
+from sklearn.metrics import accuracy_score
 
 logger = Logger()
 
@@ -199,7 +200,7 @@ def propagate_labels(sampled_predicted_labels: dict, mapping):
 if __name__ == "__main__":
     import os
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
     loader = UADetracLoader()
     skip_rate = 15
     sampling_rate = 6
@@ -210,9 +211,9 @@ if __name__ == "__main__":
     labels = labels['vehicle']
 
     images, labels, boxes = loader.filter_input3(images, labels, boxes)
-    images = images[:20000]
-    labels = labels[:20000]
-    boxes = boxes[:20000]
+    #images = images[:20000]
+    #labels = labels[:20000]
+    #boxes = boxes[:20000]
 
 
     image_count = len(images)
@@ -222,7 +223,7 @@ if __name__ == "__main__":
 
     from eva_storage.UNet import UNet
     network = UNet()
-    images_compressed, _ = network.execute(images, load_dir = '/nethome/jbang36/eva_jaeho/data/models/unet_plain_testdata_0430-epoch60.pth')
+    images_compressed, _ = network.execute(images, load_dir = '/nethome/jbang36/eva_jaeho/data/models/unet_plain_testdata_0505-epoch60.pth')
 
 
     from eva_storage.clusterModule import ClusterModule
@@ -283,7 +284,7 @@ if __name__ == "__main__":
     ## propagate the labels and compute precision
     sampled_propagated_predicted_labels = propagate_labels(sampled_predicted_labels, mapping)
 
-    from sklearn.metrics import accuracy_score
+
 
     for key, value in all_gt_labels.items():
         score = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])

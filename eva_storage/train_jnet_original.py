@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
     directory_begin = '/nethome/jbang36/eva_jaeho/data/models/plain'
 
-    model_name = 'unet_plain_testdata_0504'
+    model_name = 'unet_plain_testdata_0505'
 
 
 

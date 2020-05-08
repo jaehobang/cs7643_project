@@ -78,33 +78,6 @@ class UADetracLoader(AbstractLoader):
         else:
             self.logger.setLogLevel(LoggingLevel.INFO)
 
-    def load_images_debug(self, dir: str = None, image_size=None):
-        """
-        This function simply loads image of given image
-        :return: image_array (numpy)
-        """
-        if image_size is not None:
-            self.image_height = image_size
-            self.image_width = image_size
-
-        if dir == None:
-            dir = os.path.join(self.eva_dir, 'data', 'ua_detrac', args.image_path)
-
-        file_names = []
-        video_start_indices = []
-
-        mvi_directories = os.listdir(dir)
-        mvi_directories.sort()
-
-        self.logger.debug(mvi_directories)
-
-
-
-        # I also need to
-
-        return
-
-
 
     def load_images(self, dir:str = None, image_size=None):
         """
@@ -112,8 +85,13 @@ class UADetracLoader(AbstractLoader):
         :return: image_array (numpy)
         """
         if image_size is not None:
-            self.image_height = image_size
-            self.image_width = image_size
+            if type(image_size) == int:
+                self.image_height = image_size
+                self.image_width = image_size
+            elif type(image_size) == list or type(image_size) == tuple:
+                print("asdfasdfasfasdsfdsdfsadfsdfasdfsadfsadfsdfsadfasdfasdfsdf")
+                self.image_width, self.image_height = image_size
+
 
         if dir == None:
             dir = os.path.join(self.eva_dir, 'data', 'ua_detrac', args.image_path)

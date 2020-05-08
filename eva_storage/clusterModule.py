@@ -56,6 +56,31 @@ class ClusterModule:
         return mapping
 
 
+    def reorder_cluster_labels(self, cluster_labels):
+        """
+        We are reordering cluster labels just for visualization purposes
+
+        :param cluster_labels:
+        :return:
+        """
+        mapping = cluster_labels
+        ordered_mapping = np.zeros(len(mapping))
+        last_seen_num = 0
+        seen_num_dict = {}
+        for i in range(len(mapping)):
+            if mapping[i] not in seen_num_dict.keys():
+                seen_num_dict[mapping[i]] = last_seen_num
+                ordered_mapping[i] = last_seen_num
+                last_seen_num += 1
+            else:
+                ordered_mapping[i] = seen_num_dict[mapping[i]]
+
+        assert(len(set(ordered_mapping)) == len(set(mapping)))
+        return ordered_mapping
+
+
+
+
     def plot_distribution(self):
         import matplotlib.pyplot as plt
         fig, axs = plt.subplots(1, 1, sharey=True, tight_layout=True)
