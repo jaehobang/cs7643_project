@@ -16,6 +16,7 @@ import config
 from torch.utils.data import Dataset
 from torchvision import transforms
 import cv2
+import time
 
 
 
@@ -128,7 +129,7 @@ class SDAE_wrapper(NetworkTemplate):
         if cuda:
             self.model.cuda()
 
-        pretrain_epochs = total_epochs // 8 * 3
+        pretrain_epochs = 100
         batch_size = 256
 
         print('Pretraining stage.')
@@ -144,7 +145,7 @@ class SDAE_wrapper(NetworkTemplate):
         )
 
         print('Training stage.')
-        finetune_epochs = total_epochs // 8 * 5
+        finetune_epochs = 100
         ae_optimizer = SGD(params=self.model.parameters(), lr=0.1, momentum=0.9)
         ae.train(
             self.dataset,
@@ -161,35 +162,35 @@ class SDAE_wrapper(NetworkTemplate):
 
 
 
-    def execute(self, test_images, image_shape):
+    def execute(self, test_images, cuda = True):
 
+        st = time.perf_counter()
         batch_size = 256
-        test_dataset = CachedUAD()
+        test_dataset = CachedUAD((self.input_width, self.input_height))
         test_dataset.set_images(test_images)
         fake_labels = np.zeros(len(test_images))
         test_dataset.set_labels(fake_labels)
         dataset_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
                                                      num_workers=4, pin_memory=True)
 
-        seg_data = np.ndarray(shape=(image_shape[0], image_shape[1], image_shape[2]), dtype=np.uint8)
+        image_shape = test_images.shape
         compressed_data = np.ndarray(shape=(image_shape[0], self.compressed_size), dtype=np.uint8)
-        self.logger.debug(f"Seg data projected shape {seg_data.shape}")
         self.logger.debug(f"Compressed data projected shape {compressed_data.shape}")
+
+        if cuda:
+            self.model.cuda()
 
         self.model.eval()
 
         for i, data_pack in enumerate(dataset_loader):
-            images_input, _ = data_pack
+            images_input = data_pack
             images_input = images_input.to(config.eval_device)
             ## TODO: need to make some fixes here, do we need to supply a 4D input?
-            compressed, final = self.model(images_input)
-            final_cpu = NetworkUtils.convertSegmented(final)  ## TODO: GPU -> CPU
+            compressed = self.model.encoder(images_input)
             compressed_cpu = NetworkUtils.convertCompressed(compressed)
-            seg_data[i * batch_size:(i + 1) * batch_size] = final_cpu
             compressed_data[i * batch_size:(i + 1) * batch_size] = compressed_cpu
 
 
-        self.logger.info(f"Processed {len(images)} in {time.perf_counter() - st} (sec)")
+        self.logger.info(f"Processed {len(test_images)} in {time.perf_counter() - st} (sec)")
         assert (compressed_data.dtype == np.uint8)
-        assert (seg_data.dtype == np.uint8)
-        return compressed_data, seg_data
+        return compressed_data

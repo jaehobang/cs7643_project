@@ -110,14 +110,14 @@ class Network:
             if load_dir is None:
                 raise ValueError
             else:
-                self.model.load(load_dir, execute = True)
+                self.model.load(load_dir)
 
 
         assert (self.model is not None)
 
         self.logger.info("Images are given, creating dataset object and executing...    ")
 
-        return self.model.execute(test_images, cuda)
+        return self.model.execute(test_images)
 
 
 

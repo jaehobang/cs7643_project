@@ -193,52 +193,9 @@ def propagate_labels(sampled_predicted_labels: dict, mapping):
 
     return new_dict
 
-#########
-####### New run script
-#######
+### refactoring
 
-if __name__ == "__main__":
-    import os
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-    loader = UADetracLoader()
-    skip_rate = 15
-    sampling_rate = 6
-
-
-    images = loader.load_images(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_images')
-    labels, boxes = loader.load_labels(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_xml')
-    labels = labels['vehicle']
-
-    images, labels, boxes = loader.filter_input3(images, labels, boxes)
-    #images = images[:20000]
-    #labels = labels[:20000]
-    #boxes = boxes[:20000]
-
-
-    image_count = len(images)
-    cluster_count = image_count // (skip_rate * sampling_rate)
-    images = images.astype(np.uint8)
-
-
-    from eva_storage.UNet import UNet
-    network = UNet()
-    images_compressed, _ = network.execute(images, load_dir = '/nethome/jbang36/eva_jaeho/data/models/unet_plain_testdata_0505-epoch60.pth')
-
-
-    from eva_storage.clusterModule import ClusterModule
-    cluster_module = ClusterModule()
-    _, rep_indices, all_cluster_labels = cluster_module.run(images_compressed, number_of_clusters = cluster_count)
-    ## we need to get rep labels, rep_boxes as well
-    rep_images = images[rep_indices]
-    rep_labels = np.array(labels)[rep_indices]
-    rep_boxes = np.array(boxes)[rep_indices]
-
-    mapping = cluster_module.get_mapping(rep_indices, all_cluster_labels)
-    mapping = mapping.astype(np.int)
-
-    ## now we have rep_frames, and we also have mappings
-
+def evaluate_with_ssd(images, labels, boxes, rep_images, rep_labels, rep_boxes, mapping):
     test_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
     test_dataset.set_images(rep_images)
     test_dataset.set_labels(rep_labels)
@@ -284,12 +241,96 @@ if __name__ == "__main__":
     ## propagate the labels and compute precision
     sampled_propagated_predicted_labels = propagate_labels(sampled_predicted_labels, mapping)
 
+    for key, value in all_gt_labels.items():
+        score = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        print(f"key: {key}, score: {score}")
 
+
+    return
+
+
+
+def evaluate_with_gt(images, labels, boxes, rep_images, rep_labels, rep_boxes, mapping):
+    test_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
+    test_dataset.set_images(rep_images)
+    test_dataset.set_labels(rep_labels)
+    test_dataset.set_boxes(rep_boxes)
+
+
+    print('hello world')
+    ## need to propagate the labels
+    ## we also need to derive the gt labels for non sampled things....we just need to convert 'labels' to binary format I think
+    ## before we do that let's examine the output of all_gt_labels, all_predicted_labels
+
+    ##TODO: propagate the label and compute precision
+    dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
+    dataset.set_images(images)
+    dataset.set_labels(labels)
+    dataset.set_boxes(boxes)
+
+    ## convert labels format
+    all_gt_labels = convert_labels_to_binary(dataset)
+    all_rep_labels = convert_labels_to_binary(test_dataset)
+
+    ## propagate the labels and compute precision
+    sampled_propagated_predicted_labels = propagate_labels(all_rep_labels, mapping)
 
     for key, value in all_gt_labels.items():
         score = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
         print(f"key: {key}, score: {score}")
 
+    return
+
+
+
+
+#########
+####### New run script
+#######
+
+if __name__ == "__main__":
+    import os
+
+    os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+    loader = UADetracLoader()
+    skip_rate = 15
+    sampling_rate = 6
+
+
+    images = loader.load_images(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_images')
+    labels, boxes = loader.load_labels(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_xml')
+    labels = labels['vehicle']
+
+    images, labels, boxes = loader.filter_input3(images, labels, boxes)
+    #images = images[:20000]
+    #labels = labels[:20000]
+    #boxes = boxes[:20000]
+
+
+    image_count = len(images)
+    cluster_count = image_count // (skip_rate * sampling_rate)
+    images = images.astype(np.uint8)
+
+
+    from eva_storage.UNet import UNet
+    network = UNet()
+    images_compressed, _ = network.execute(images, load_dir = '/nethome/jbang36/eva_jaeho/data/models/unet_plain_testdata_0505-epoch60.pth')
+
+
+    from eva_storage.clusterModule import ClusterModule
+    cluster_module = ClusterModule()
+    _, rep_indices, all_cluster_labels = cluster_module.run(images_compressed, number_of_clusters = cluster_count)
+    ## we need to get rep labels, rep_boxes as well
+    rep_images = images[rep_indices]
+    rep_labels = np.array(labels)[rep_indices]
+    rep_boxes = np.array(boxes)[rep_indices]
+
+    mapping = cluster_module.get_mapping(rep_indices, all_cluster_labels)
+    mapping = mapping.astype(np.int)
+
+    ## now we have rep_frames, and we also have mappings
+    ##evaluate_with_ssd(images, labels, boxes, rep_images, rep_labels, rep_boxes)
+    evaluate_with_gt(images, labels, boxes, rep_images, rep_labels, rep_boxes, mapping)
 
 
 ##############################################

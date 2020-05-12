@@ -11,6 +11,8 @@ from logger import Logger
 from others.amdegroot.eval_uad2 import * ## we import all the functions from here and perform our own evaluation
 from others.amdegroot.data.uad import UAD_ROOT, UADAnnotationTransform, UADDetection
 from others.amdegroot.data.uad import UAD_CLASSES as labelmap
+from eva_storage.sampling_experiments.sampling_utils import *
+
 
 logger = Logger()
 
@@ -150,15 +152,15 @@ def sample3(images, labels, boxes, sampling_rate = 30):
     assert(len(reference_indexes) == len(images))
     return images[::sampling_rate], labels[::sampling_rate], boxes[::sampling_rate], reference_indexes
 
-
+"""
 def convert_labels_to_binary(dataset):
-    """
+    
     this generates format as follows:
     {'car', :[1,0,1,1,1,1,1,1,.....],
      'bus' : [0,0,0,1,1,1,1,1,1].....}
     :param dataset: dataset object
     :return: above
-    """
+    
 
     label_dict = {}
     for cls_index, cls in enumerate(labelmap):
@@ -182,23 +184,23 @@ def propagate_labels(sampled_predicted_labels:dict, mapping):
 
     return new_dict
 
-
+"""
 
 ########### experiments with much more data loaded / evaluated
 
 if __name__ == "__main__":
-
-
+    total_eval_num = 2000
 
     loader = UADetracLoader()
     ## we assume the skip rate is 15, but in essence, we are performing uniform sampling once every 4 images
-    sampling_rate = 93
 
     images = loader.load_images(dir = '/nethome/jbang36/eva_jaeho/data/ua_detrac/test_images')
     labels, boxes = loader.load_labels(dir = '/nethome/jbang36/eva_jaeho/data/ua_detrac/test_xml')
     labels = labels['vehicle']
 
     images, labels, boxes = loader.filter_input3(images, labels, boxes)
+
+    sampling_rate = int(len(images) / total_eval_num)
 
     ## let's sample images
     images_us, labels_us, boxes_us, mapping = sample3(images, labels, boxes, sampling_rate = sampling_rate)
@@ -209,56 +211,8 @@ if __name__ == "__main__":
     test_dataset.set_labels(labels_us)
     test_dataset.set_boxes(boxes_us)
 
-    trained_model = '/nethome/jbang36/eva_jaeho/others/amdegroot/weights/finalists/ssd300_UAD_0408_90000.pth'
-    args.trained_model = trained_model
-    num_classes = len(labelmap) + 1  # +1 for background
-    net = build_ssd('test', 300, num_classes)  # initialize SSD
-    net.load_state_dict(torch.load(args.trained_model))
-    net.eval()
-    logger.info(f"Loaded model {args.trained_model}")
+    evaluate_with_gt(images, labels, boxes, images_us, labels_us, boxes_us, mapping)
 
-    if args.cuda:
-        net = net.cuda()
-        cudnn.benchmark = True
-
-    import time
-    st = time.perf_counter()
-    output_dir = get_output_dir('ssd300_uad', set_type)
-    box_list = detect_all_boxes(net, test_dataset, output_dir)
-    et = time.perf_counter()
-
-    write_voc_results_file(box_list, test_dataset)
-
-    all_class_recs, nposes = group_annotation_by_class(test_dataset)
-
-
-    image_count = len(images_us)
-    sampled_gt_labels, sampled_predicted_labels = do_python_eval_for_uniform_sampling(all_class_recs, nposes, image_count, output_dir)
-
-    print('hello world')
-    ## need to propagate the labels
-    ## we also need to derive the gt labels for non sampled things....we just need to convert 'labels' to binary format I think
-    ## before we do that let's examine the output of all_gt_labels, all_predicted_labels
-
-    ##TODO: propagate the label and compute precision
-    dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
-    dataset.set_images(images)
-    dataset.set_labels(labels)
-    dataset.set_boxes(boxes)
-
-    ## convert labels format
-    all_gt_labels = convert_labels_to_binary(dataset)
-
-    ## propagate the labels and compute precision
-    sampled_propagated_predicted_labels = propagate_labels(sampled_predicted_labels, mapping)
-
-    from sklearn.metrics import accuracy_score
-
-    for key, value in all_gt_labels.items():
-        score = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
-        print(f"key: {key}, score: {score}")
-
-    logger.info(f"Total time taken for evaluating {len(images_us)} is {et - st} (secs)")
 
 
     """
