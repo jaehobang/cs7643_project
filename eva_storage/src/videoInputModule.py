@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 
-from eva_storage.decompressionModule import DecompressionModule
+from loaders.decompressionModule import DecompressionModule
 
 
 class VideoInputModule:

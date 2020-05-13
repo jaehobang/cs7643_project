@@ -7,6 +7,7 @@
 """
 
 from loaders.uadetrac_loader import UADetracLoader
+from loaders.jackson_loader import JacksonLoader
 from logger import Logger
 from others.amdegroot.eval_uad2 import * ## we import all the functions from here and perform our own evaluation
 from others.amdegroot.data.uad import UAD_ROOT, UADAnnotationTransform, UADDetection
@@ -188,17 +189,39 @@ def propagate_labels(sampled_predicted_labels:dict, mapping):
 
 ########### experiments with much more data loaded / evaluated
 
-if __name__ == "__main__":
-    total_eval_num = 2000
+def create_dummy_boxes(labels):
+    boxes = []
+    for i in range(len(labels)):
+        box_frame = []
+        for j in labels[i]:
+            box_frame.append((0,0,0,0))
+        boxes.append(box_frame)
+    return boxes
 
+
+
+
+if __name__ == "__main__":
+    total_eval_num = 100
+    """
     loader = UADetracLoader()
     ## we assume the skip rate is 15, but in essence, we are performing uniform sampling once every 4 images
 
     images = loader.load_images(dir = '/nethome/jbang36/eva_jaeho/data/ua_detrac/test_images')
     labels, boxes = loader.load_labels(dir = '/nethome/jbang36/eva_jaeho/data/ua_detrac/test_xml')
     labels = labels['vehicle']
-
     images, labels, boxes = loader.filter_input3(images, labels, boxes)
+
+    """
+    loader = JacksonLoader()
+    images = loader.load_images(image_size = 300)
+
+    ## we want to filter out only the ones that we want to use
+    from others.amdegroot.data.jackson import JACKSON_CLASSES
+    labels = loader.load_labels(relevant_classes = JACKSON_CLASSES)
+
+    images, labels = loader.filter_input(images, labels)
+    boxes = create_dummy_boxes(labels)
 
     sampling_rate = int(len(images) / total_eval_num)
 
@@ -211,7 +234,8 @@ if __name__ == "__main__":
     test_dataset.set_labels(labels_us)
     test_dataset.set_boxes(boxes_us)
 
-    evaluate_with_gt(images, labels, boxes, images_us, labels_us, boxes_us, mapping)
+
+    evaluate_with_gt(images, labels, boxes, images_us, labels_us, boxes_us, mapping, JACKSON_CLASSES)
 
 
 

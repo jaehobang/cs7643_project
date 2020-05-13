@@ -1,11 +1,11 @@
 
 from others.amdegroot.eval_uad2 import *  ## we import all the functions from here and perform our own evaluation
 from others.amdegroot.data.uad import UAD_ROOT, UADAnnotationTransform, UADDetection
-from others.amdegroot.data.uad import UAD_CLASSES as labelmap
+#from others.amdegroot.data.uad import UAD_CLASSES as labelmap
 from sklearn.metrics import accuracy_score
 
 
-def convert_labels_to_binary(dataset):
+def convert_labels_to_binary(dataset, labelmap):
     """
     this generates format as follows:
     {'car', :[1,0,1,1,1,1,1,1,.....],
@@ -39,7 +39,7 @@ def propagate_labels(sampled_predicted_labels: dict, mapping):
 
 
 
-def evaluate_with_gt(images, labels, boxes, rep_images, rep_labels, rep_boxes, mapping):
+def evaluate_with_gt(images, labels, boxes, rep_images, rep_labels, rep_boxes, mapping, labelmap):
     test_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
     test_dataset.set_images(rep_images)
     test_dataset.set_labels(rep_labels)
@@ -58,8 +58,8 @@ def evaluate_with_gt(images, labels, boxes, rep_images, rep_labels, rep_boxes, m
     dataset.set_boxes(boxes)
 
     ## convert labels format
-    all_gt_labels = convert_labels_to_binary(dataset)
-    all_rep_labels = convert_labels_to_binary(test_dataset)
+    all_gt_labels = convert_labels_to_binary(dataset, labelmap)
+    all_rep_labels = convert_labels_to_binary(test_dataset, labelmap)
 
     ## propagate the labels and compute precision
     sampled_propagated_predicted_labels = propagate_labels(all_rep_labels, mapping)
@@ -218,3 +218,12 @@ def evaluate_with_ssd(images, labels, boxes, rep_images, rep_labels, rep_boxes, 
 
     return
 
+
+def create_dummy_boxes(labels):
+    boxes = []
+    for i in range(len(labels)):
+        box_frame = []
+        for j in labels[i]:
+            box_frame.append((0,0,0,0))
+        boxes.append(box_frame)
+    return boxes
