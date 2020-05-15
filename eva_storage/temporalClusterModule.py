@@ -4,6 +4,7 @@ import time
 from sklearn.cluster import AgglomerativeClustering
 from logger import Logger
 from eva_storage.samplingMethods import MiddleEncounterMethod
+from eva_storage.featureExtractionMethods import DownSampleMeanMethod, DownSampleSkippingMethod
 import numpy as np
 
 # Assume you have compressed images: images_compressed
@@ -14,21 +15,25 @@ import numpy as np
 
 class TemporalClusterModule:
 
-    def __init__(self, sampling_method=MiddleEncounterMethod()):
+    def __init__(self, downsample_method= DownSampleSkippingMethod(), sampling_method=MiddleEncounterMethod()):
         self.ac = None
         self.sampling_method = sampling_method
+        self.downsample_method = downsample_method
+        self.vector_size = 100
         self.logger = Logger()
 
-    def run(self, image_compressed, number_of_clusters, number_of_neighbors = 5):
+    def run(self, images, number_of_clusters, number_of_neighbors = 3):
         """
         :param image_compressed:
         :param fps:
         :return: sampled frames, corresponding cluster numbers for each instance
         """
         self.logger.info("Cluster module starting....")
-        n_samples = len(image_compressed)
+        n_samples = len(images)
 
         start_time = time.perf_counter()
+
+        image_compressed = self.downsample_method.run(images, self.vector_size)
 
         connectivity = self.generate_connectivity_matrix(image_compressed, number_of_neighbors)
         self.ac = AgglomerativeClustering(n_clusters=number_of_clusters, connectivity=connectivity,

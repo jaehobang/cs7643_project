@@ -229,12 +229,6 @@ if __name__ == "__main__":
     images_us, labels_us, boxes_us, mapping = sample3(images, labels, boxes, sampling_rate = sampling_rate)
 
 
-    test_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
-    test_dataset.set_images(images_us)
-    test_dataset.set_labels(labels_us)
-    test_dataset.set_boxes(boxes_us)
-
-
     evaluate_with_gt(images, labels, boxes, images_us, labels_us, boxes_us, mapping, JACKSON_CLASSES)
 
 
