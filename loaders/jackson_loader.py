@@ -72,20 +72,21 @@ class JacksonLoader(AbstractLoader):
         st = time.perf_counter()
         self.images = self.decompressionModule.convert2images(dir)
         self.logger.info(f"Loaded {len(self.images)} in {time.perf_counter() - st} (secs)")
-
         n, width, height, channels = self.images.shape
-        images = np.ndarray(shape = (n, self.image_width, self.image_height, channels))
-        if self.image_width != width or self.image_height != height:
-            for i in range(n):
-                img = cv2.resize(self.images[i], (self.image_width, self.image_height))
-                images[i] = img
 
+        if image_size is not None:
+            images = np.ndarray(shape = (n, self.image_height, self.image_width, channels))
+            if self.image_width != width or self.image_height != height:
+                for i in range(n):
+                    img = cv2.resize(self.images[i], (self.image_width, self.image_height))
+                    images[i] = img
 
+            self.images = images
         self.logger.info(f"Total time to load {n} images: {time.perf_counter() - st} (sec)")
 
         return self.images
 
-    def load_labels(self, dir: str = None):
+    def load_labels(self, dir: str = None, relevant_classes = None):
         """
         Loads vehicle type, speed, color, and intersection of ua-detrac
         vehicle type, speed is given by the dataset
@@ -94,19 +95,20 @@ class JacksonLoader(AbstractLoader):
         """
 
         if dir == None:
-            dir = os.path.join('/nethome/jbang36/eva_jaeho/data', 'jackson-town-square.csv')
+            dir = os.path.join('/nethome/jbang36/eva_jaeho/data/jackson_town_square', 'jackson_town_square.csv')
 
         frame_count_limit = self.decompressionModule.get_frame_count()
 
         labels = pd.read_csv(dir)
         # Preview the first 5 lines of the loaded data
 
-        converted_labels = self.convert_labels2(labels, frame_count_limit)
+        converted_labels = self.convert_labels(labels, frame_count_limit, relevant_classes = relevant_classes)
         return converted_labels
 
 
-    def convert_labels2(self, labels, frame_limit_count):
+    def convert_labels(self, labels, frame_limit_count, relevant_classes = None):
         assert (frame_limit_count < len(labels))
+
         ###generate the output list of list object
         output = []
         for i in range(frame_limit_count):
@@ -114,7 +116,12 @@ class JacksonLoader(AbstractLoader):
 
         i = 0
         while labels['frame'][i] < frame_limit_count:
-            output[labels['frame'][i]].append(labels['object_name'][i])
+            obj = labels['object_name'][i]
+            if relevant_classes is None:
+                output[labels['frame'][i]].append(obj)
+            else:
+                if obj in relevant_classes:
+                    output[labels['frame'][i]].append(obj)
             i += 1
 
         return output
