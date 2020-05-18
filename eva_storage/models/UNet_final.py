@@ -18,7 +18,6 @@ class UNet_final(nn.Module):
         self.K = 10
         self.output_channels = 1
         self.input_channels = 3
-        self.seg_channels = 2
         self.middle_neural_count = middle_neural_count
 
         self.create_enc()
