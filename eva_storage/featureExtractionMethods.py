@@ -30,7 +30,7 @@ class VGG16Method(FeatureExtractionMethod):
 class DownSampleMaxMethod(FeatureExtractionMethod):
 
     def __str__(self):
-        return "Downsample the image by avg pixel blocks"
+        return "Downsample the image by choosing max value in pixel blocks"
 
     def run(self, images, desired_vector_size):
         assert(desired_vector_size % 10 == 0)

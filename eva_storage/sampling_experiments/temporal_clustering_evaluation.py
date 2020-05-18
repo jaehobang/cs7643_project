@@ -8,6 +8,7 @@ from loaders.jackson_loader import JacksonLoader
 from eva_storage.sampling_experiments.sampling_utils import create_dummy_boxes, evaluate_with_gt
 from eva_storage.temporalClusterModule import TemporalClusterModule
 from eva_storage.featureExtractionMethods import DownSampleMeanMethod, DownSampleMeanMethod2, DownSampleMaxMethod
+from eva_storage.samplingMethods import *
 from others.amdegroot.data.jackson import JACKSON_CLASSES
 from others.amdegroot.eval_uad2 import * ## we import all the functions from here and perform our own evaluation
 
@@ -19,7 +20,7 @@ from others.amdegroot.eval_uad2 import * ## we import all the functions from her
 if __name__ == "__main__":
 
 
-    total_eval_num = 100
+    total_eval_num = 2000
 
     loader = JacksonLoader()
     images = loader.load_images()
@@ -36,8 +37,9 @@ if __name__ == "__main__":
     cluster_count = total_eval_num
     number_of_neighbors = 3
 
-    feature_extraction_method = DownSampleMeanMethod2()
-    temporal_cluster = TemporalClusterModule(downsample_method=feature_extraction_method)
+    feature_extraction_method = DownSampleMeanMethod()
+    rep_selection_method = MeanEncounterMethod()
+    temporal_cluster = TemporalClusterModule(downsample_method=feature_extraction_method, sampling_method=rep_selection_method)
     _, rep_indices, all_cluster_labels = temporal_cluster.run(images, number_of_clusters=cluster_count,
                                                               number_of_neighbors=number_of_neighbors)
     ## we need to get rep labels, rep_boxes as well

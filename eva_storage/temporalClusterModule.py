@@ -41,7 +41,7 @@ class TemporalClusterModule:
         labels = self.ac.fit_predict(image_compressed)
         self.logger.info(f"Time to fit {n_samples}: {time.perf_counter() - start_time} (sec)")
         self.logger.info(f"Sampling frames based on {str(self.sampling_method)} strategy")
-        rep_indices = self.sampling_method.run(labels) ## we also need to get the mapping from this information
+        rep_indices = self.sampling_method.run(labels, image_compressed) ## we also need to get the mapping from this information
 
 
         return image_compressed[rep_indices], rep_indices, labels
