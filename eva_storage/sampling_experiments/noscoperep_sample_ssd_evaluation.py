@@ -1,317 +1,162 @@
 """
-We implement no scope functionality and evaluate on ssd
 
+Implementation of Noscope's time diff detector using background image as reference frame
+
+General Process:
+1. We divide the dataset according to the video
+2. We generate a background image depending on the video (examples are given noscoperep_experiment.ipynb
+3. Threshold is generated to match the amount of images that need to be examined for other methods
+4. Evaluation is done by propagating the labels to the neighboring frames
 """
 
-"""
-
-1. Use the representative frame method from noscope and evaluate on UAD
 
 
-
-"""
-
-from loaders.uadetrac_loader import UADetracLoader
-from logger import Logger
+import os
+import sys
+sys.argv=['']
+sys.path.append('/nethome/jbang36/eva_jaeho')
 from others.amdegroot.eval_uad2 import *  ## we import all the functions from here and perform our own evaluation
 from others.amdegroot.data.uad import UAD_ROOT, UADAnnotationTransform, UADDetection
 from others.amdegroot.data.uad import UAD_CLASSES as labelmap
+from eva_storage.sampling_experiments.no_sample_ssd_evaluation import do_python_eval_for_uniform_sampling, \
+    convert_labels_to_binary, propagate_labels
 
-logger = Logger()
-
-
-#################################################################################################
-#################################################################################################
+from loaders.uadetrac_loader import UADetracLoader
 
 
-def gather_labels_by_frame(detpath, classname, class_recs, npos, image_count, ovthresh=0.5, use_07_metric=True):
-    """rec, prec, ap = voc_eval(detpath,
-                           annopath,
-                           imagesetfile,
-                           classname,
-                           [ovthresh],
-                           [use_07_metric])
-    Top level function that does the PASCAL VOC evaluation.
-    detpath: Path to detections
-       detpath.format(classname) should produce the detection results file.
-    classname: Category name (duh)
-    [ovthresh]: Overlap threshold (default = 0.5)
-    [use_07_metric]: Whether to use VOC07's 11 point AP computation
-       (default True)
-
-       TODO: make it return labels, whether it be 0, 1, 2, 3 or
-    """
-    # assumes detections are in detpath.format(classname)
-
-    # read dets
-    detfile = detpath.format(classname)
-    with open(detfile, 'r') as f:
-        lines = f.readlines()
-    if any(lines) == 1:
-
-        splitlines = [x.strip().split(' ') for x in lines]
-        image_ids = [x[0] for x in splitlines]
-        confidence = np.array([float(x[1]) for x in splitlines])
-
-        # sort by confidence
-        sorted_ind = np.argsort(-confidence)
-        image_ids = [image_ids[x] for x in sorted_ind]
-
-        # go down dets and mark TPs and FPs
-        nd = len(image_ids)
-        predicted_labels = np.zeros(image_count)
-        gt_labels = np.zeros(image_count)
-
-        for d in range(nd):
-            R = class_recs[int(image_ids[d])]
-            BBGT = R['bbox'].astype(float)
-            if BBGT.size > 0:
-                gt_labels[int(image_ids[d])] = 1
-
-            if confidence[d] > ovthresh:
-                ## we denote prediction as 1
-                predicted_labels[int(image_ids[d])] = 1
-
-    return gt_labels, predicted_labels
+import numpy as np
 
 
-##################################################################################################
-##################################################################################################
+def get_ref_frames_per_video(test_images, test_labels, test_vi):
+    # get frames that don't have annotation -- we will assume that these frames are the ones that don't have labels
+    empty_annotations = []
+    for i in range(len(test_labels)):
+        if test_labels[i] is None:
+            empty_annotations.append(i)
+    empty_annotations = np.array(empty_annotations)
 
-def do_python_eval_for_uniform_sampling(all_class_recs, nposes, image_count, output_dir='output', use_07=True):
-    """
-    This function simply wraps the voc_eval function that does the main evaluation
-    This function wraps and simply presents the AP values for each given class
-    :param true_case_stats -- I have no idea what this is yet
-    :param all_gt_boxes -- ground truth boxes that are organized in terms of image indexes
-    :param all_difficult_case -- I have no idea what this is yet
-    :param output_dir: directory to where detection files are located
-    :param use_07: whether to use 07 evaluation format
-    :return:
-    """
-    # cachedir = os.path.join(devkit_path, 'annotations_cache')
-    aps = []
-    all_gt_labels = {}
-    all_predicted_labels = {}
-    # The PASCAL VOC metric changed in 2010
-    use_07_metric = use_07
-    print('VOC07 metric? ' + ('Yes' if use_07_metric else 'No'))
-    if not os.path.isdir(output_dir):
-        os.mkdir(output_dir)
-    for i, cls in enumerate(labelmap):
-        filename = get_voc_results_file_template(set_type, cls)
+    empty_images = test_images[empty_annotations]
 
-        gt_labels, predicted_labels = gather_labels_by_frame(filename, cls, all_class_recs[cls], nposes[cls],
-                                                             image_count, ovthresh=0.5, use_07_metric=use_07_metric)
-        ## labels is [0,1 ....]? need to check this
+    ####discard consecutive numbers
+    filtered = []
+    previous = -1
+    for i in range(len(empty_annotations)):
+        if previous == -1:
+            filtered.append(empty_annotations[i])
+            previous = empty_annotations[i]
+        elif empty_annotations[i] == previous + 1:
+            previous += 1
+        else:
+            filtered.append(empty_annotations[i])
+            previous = empty_annotations[i]
 
-        all_gt_labels[cls] = gt_labels
-        all_predicted_labels[cls] = predicted_labels
+    # number of reference images = len(test_vi) - 1
+    ref_images = np.ndarray(shape=(len(test_vi) - 1, test_images.shape[1], test_images.shape[2], test_images.shape[3]),
+                            dtype=np.uint8)
 
-    ##TODO: make sure what the keys are
-    print(all_gt_labels.keys())
-    print(all_predicted_labels.keys())
-    return all_gt_labels, all_predicted_labels
+    for i in range(len(test_vi) - 1):
+        start_index = test_vi[i]
+        end_index = test_vi[i + 1]
+        no_anno_frames = []
+        for j in range(len(empty_annotations)):
+            if empty_annotations[j] > start_index and empty_annotations[j] < end_index:
+                no_anno_frames.append(empty_annotations[j])
 
+        ## if we have unannotated frames, avg them and use them as reference
+        if len(no_anno_frames) > 0:
+            chosen_images = test_images[np.array(no_anno_frames)]
+            ref_images[i] = np.mean(chosen_images, axis=0).astype(np.uint8)
 
-##################################################################################
-##################################################################################
+        ## if we don't have, avg all frames within video
+        else:
+            chosen_images = test_images[start_index:end_index, :, :, :]
+            ref_images[i] = np.mean(chosen_images, axis=0).astype(np.uint8)
 
-def load_original_data(test=True):
-    if test:
-        loader = UADetracLoader()
+    return ref_images
 
-        test_images = loader.load_cached_images(name='uad_test_images.npy', vi_name='uad_test_vi.npy')
-        test_labels = loader.load_cached_labels(name='uad_test_labels.npy')
-        test_boxes = loader.load_cached_boxes(name='uad_test_boxes.npy')
+def get_eval_indices(skipped_images, skipped_vi, ref_images):
+    ### make threshold around 76
+    ### now we need to derive the frames that will be evaluated using DL and the corresponding mappings
+    frames_to_eval_indices = []
+    #video_it_refers_to = []
+    threshold = 90
 
-        test_labels = test_labels['vehicle']
+    for i in range(len(skipped_images)):
+        for j in range(len(skipped_vi) - 1):
+            if i >= skipped_vi[j] and i < skipped_vi[j + 1]:
+                mse_error = np.square(np.subtract(skipped_images[i], ref_images[j])).mean()
+                if mse_error > threshold:
+                    frames_to_eval_indices.append(i)
+                    #video_it_refers_to.append(j)
+                break
 
-        test_images, test_labels, test_boxes = loader.filter_input3(test_images, test_labels, test_boxes)
+    return frames_to_eval_indices
 
-        return test_images, test_labels, test_boxes
+def get_rep_propagation_mapping(skipped_images, frames_to_eval_indices):
+    initial_mapping = np.zeros(len(skipped_images))
+    curr_index = 0
+    for i in range(len(initial_mapping)):
+        if i < frames_to_eval_indices[curr_index]:
+            initial_mapping[i] = curr_index
+        else:  # i == frames_to_eval_indices[curr_index]
+            initial_mapping[i] = curr_index
+            if curr_index < len(frames_to_eval_indices) - 1:
+                curr_index += 1
 
-    else:
-        logger.error("not implemented yet!!!")
-        return None
+    return initial_mapping
 
-
-def sample3(images, labels, boxes, sampling_rate=30):
-    ## for uniform sampling, we will say all the frames until the next selected from is it's 'property'
-    reference_indexes = []
-    length = len(images[::sampling_rate])
-
+def get_skip_propagation_mapping(filtered_images, initial_mapping, sampling_rate):
+    reference_indexes = np.zeros(len(filtered_images))
+    length = len(initial_mapping)
     for i in range(length):
         for j in range(sampling_rate):
-            if i * sampling_rate + j >= len(images):
+            k = i * sampling_rate + j
+            if k >= len(reference_indexes):
                 break
-            reference_indexes.append(i)
+            reference_indexes[k] = initial_mapping[i]
 
-    assert (len(reference_indexes) == len(images))
-    return images[::sampling_rate], labels[::sampling_rate], boxes[::sampling_rate], reference_indexes
-
-
-def sample_jnet(images, labels, boxes, sampling_rate=30):
-    """
-    TODO:
-
-    :param images:
-    :param labels:
-    :param boxes:
-    :param sampling_rate:
-    :return:
-    """
-    ## we determine the number of clusters through sampling rate
-    cluster_num = len(images) / sampling_rate
+    return reference_indexes
 
 
-def convert_labels_to_binary(dataset):
-    """
-    this generates format as follows:
-    {'car', :[1,0,1,1,1,1,1,1,.....],
-     'bus' : [0,0,0,1,1,1,1,1,1].....}
-    :param dataset: dataset object
-    :return: above
-    """
-
-    label_dict = {}
-    for cls_index, cls in enumerate(labelmap):
-        label_dict[cls] = np.zeros(len(dataset))
-
-    for image_id in range(len(dataset)):
-        labels = dataset.get_labels(image_id)  # ['car', 'car', 'bus', 'car', 'car'....]
-        for label_id, label in enumerate(labels):
-            label_dict[label][image_id] = 1
-
-    return label_dict
-
-
-def propagate_labels(sampled_predicted_labels: dict, mapping):
-    ## we propagate the labels from sampling to all frames
-    new_dict = {}
-    for key, value in sampled_predicted_labels.items():
-        print(f"{key}, type of key {type(key)}")
-        new_dict[key] = np.zeros(len(mapping))
-        for i in range(len(mapping)):
-            new_dict[key][i] = sampled_predicted_labels[key][mapping[i]]
-
-    return new_dict
-
-
-def get_rep_indices(images, t_diff, delta_diff):
-    """
-
-    :param images: are already SAMPLED IMAGES -- around 3600 ish
-    :return: representative frames, and mapping so that we can convert from rep frames to all frames
-    """
-    ## TODO: mapping's values should be the indices of the rep_frame it refers to
-    ## we will be using a MSE evaluation method
-    rep_frames_indices = [0]
-    mapping = [0]
-    curr_ref = 0
-
-    for i in range(0, len(images) - 1, t_diff):
-        mse_error = np.square(np.subtract(images[i], images[i+1])).mean()
-        if mse_error > delta_diff:
-            rep_frames_indices.append(i+1)
-            curr_ref += 1
-            mapping.append(curr_ref)
-        else:
-            mapping.append(curr_ref)
-
-    assert(len(mapping) == len(images))
-    rep_frames_indices = np.array(rep_frames_indices)
-    return rep_frames_indices, mapping
-
-
-
-
-
-def sample3(images, labels, boxes, sampling_rate = 30):
-    ## for uniform sampling, we will say all the frames until the next selected from is it's 'property'
-    reference_indexes = []
-    length = len(images[::sampling_rate])
-
-    for i in range(length):
-        for j in range(sampling_rate):
-            if i * sampling_rate + j >= len(images):
-                break
-            reference_indexes.append(i)
-
-    assert(len(reference_indexes) == len(images))
-    return images[::sampling_rate], labels[::sampling_rate], boxes[::sampling_rate], reference_indexes
-
-
-
-def get_final_mapping(mapping, skip_rate, original_image_count):
-    """
-    We need this function because we apply the difference detector after skipping frames, so the mapping is from
-    :param mapping:
-    :param skip_rate:
-    :param original_image_count:
-    :return:
-    """
-    final_mapping = np.zeros(original_image_count)
-    for i in range(original_image_count):
-        if (i // skip_rate) >= len(mapping):
-            print(i, skip_rate, len(mapping))
-            print("--------------")
-        else:
-            final_mapping[i] = mapping[i // skip_rate]
-    return final_mapping
-
-
-#########
-####### New run script
-#######
 
 
 
 if __name__ == "__main__":
-    import os
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     loader = UADetracLoader()
+    test_images = loader.load_images(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_images')
+    test_labels, test_boxes = loader.load_labels(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_xml')
+    test_vi = loader.get_video_start_indices()
+    test_labels = test_labels['vehicle']
+
+
+    ref_images = get_ref_frames_per_video(test_images, test_labels, test_vi)
+
+    filtered_images, filtered_labels, filtered_boxes, filtered_vi = loader.filter_input3(test_images, test_labels,
+                                                                                         test_boxes, test_vi)
     skip_rate = 15
-    ## we are not sure how many frames we will evaluate, but diff detection should return True or False as to whether we should evaluate
+    skipped_images = filtered_images[::skip_rate]
+    skipped_labels = filtered_labels[::skip_rate]
+    skipped_boxes = filtered_boxes[::skip_rate]
+    skipped_vi = filtered_vi / skip_rate
+    skipped_vi = np.ceil(skipped_vi)
 
+    ## avg MSE is around 76, variance is 176
+    frames_to_eval_indices = get_eval_indices(skipped_images, skipped_vi, ref_images)
+    initial_mapping = get_rep_propagation_mapping(skipped_images, frames_to_eval_indices)
+    mapping = get_skip_propagation_mapping(filtered_images, initial_mapping, skip_rate)
+    mapping = mapping.astype(np.int)
 
-    t_diff = 1 ##TODO: we need to experiment with this as well but since we have skip_rate of 15, I think it will be okay
-    delta_diff = 60  ##TODO: we need to modify this parameter (experiments in NoScope is probably using normalized images
-
-    images = loader.load_images(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_images')
-    labels, boxes = loader.load_labels(dir='/nethome/jbang36/eva_jaeho/data/ua_detrac/test_xml')
-    labels = labels['vehicle']
-
-    images, labels, boxes = loader.filter_input3(images, labels, boxes)
-
-    ### we skip frames
-
-    images_us = images[::skip_rate]
-    labels_us = labels[::skip_rate]
-    boxes_us = boxes[::skip_rate]
-    # convert to np arrays to do index slicing
-    labels_us = np.array(labels_us)
-    boxes_us = np.array(boxes_us)
-
-    image_count = len(images)
-    assert(images_us.dtype == np.uint8)
-
-    rep_indices, mapping = get_rep_indices(images_us, t_diff, delta_diff)
-    rep_images = images_us[rep_indices]
-    rep_labels = labels_us[rep_indices]
-    rep_boxes = boxes_us[rep_indices]
-
-    final_mapping = get_final_mapping(mapping, skip_rate, len(images))
-    final_mapping = final_mapping.astype(np.int)
-
-    ## now we have rep_frames, and we also have mappings
+    skipped_labels = np.array(skipped_labels)
+    skipped_boxes = np.array(skipped_boxes)
+    images_eval = skipped_images[frames_to_eval_indices]
+    labels_eval = skipped_labels[frames_to_eval_indices]
+    boxes_eval = skipped_boxes[frames_to_eval_indices]
 
     test_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
-    test_dataset.set_images(rep_images)
-    test_dataset.set_labels(rep_labels)
-    test_dataset.set_boxes(rep_boxes)
-
+    test_dataset.set_images(images_eval)
+    test_dataset.set_labels(labels_eval)
+    test_dataset.set_boxes(boxes_eval)
 
     trained_model = '/nethome/jbang36/eva_jaeho/others/amdegroot/weights/finalists/ssd300_UAD_0408_90000.pth'
     args.trained_model = trained_model
@@ -321,37 +166,40 @@ if __name__ == "__main__":
     net.eval()
     logger.info(f"Loaded model {args.trained_model}")
 
-    if args.cuda:
-        net = net.cuda()
-        cudnn.benchmark = True
 
+    net = net.cuda()
+    cudnn.benchmark = True
+
+    import time
+
+    st = time.perf_counter()
     output_dir = get_output_dir('ssd300_uad', set_type)
     box_list = detect_all_boxes(net, test_dataset, output_dir)
+    et = time.perf_counter()
 
     write_voc_results_file(box_list, test_dataset)
 
     all_class_recs, nposes = group_annotation_by_class(test_dataset)
 
-    image_count = len(rep_images)
+
+    image_count = len(images_eval)
     sampled_gt_labels, sampled_predicted_labels = do_python_eval_for_uniform_sampling(all_class_recs, nposes,
                                                                                       image_count, output_dir)
 
-    print('hello world')
-    ## need to propagate the labels
-    ## we also need to derive the gt labels for non sampled things....we just need to convert 'labels' to binary format I think
-    ## before we do that let's examine the output of all_gt_labels, all_predicted_labels
-
     ##TODO: propagate the label and compute precision
     dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
-    dataset.set_images(images)
-    dataset.set_labels(labels)
-    dataset.set_boxes(boxes)
+    dataset.set_images(filtered_images)
+    dataset.set_labels(filtered_labels)
+    dataset.set_boxes(filtered_boxes)
+
 
     ## convert labels format
     all_gt_labels = convert_labels_to_binary(dataset)
 
     ## propagate the labels and compute precision
-    sampled_propagated_predicted_labels = propagate_labels(sampled_predicted_labels, final_mapping)
+
+    sampled_propagated_predicted_labels = propagate_labels(sampled_predicted_labels, mapping)
+
 
     from sklearn.metrics import accuracy_score
 
@@ -360,14 +208,5 @@ if __name__ == "__main__":
         print(f"key: {key}, score: {score}")
 
 
-"""
-RESULTS:
-car, type of key <class 'str'>
-bus, type of key <class 'str'>
-others, type of key <class 'str'>
-van, type of key <class 'str'>
-key: car, score: 0.9891395303291969
-key: bus, score: 0.5857175921804618
-key: others, score: 0.5655278010219524
-key: van, score: 0.5822636067441737
-"""
+    logger.info(f"Total time taken for evaluating {len(images_eval)} is {et - st} (secs)")
+
