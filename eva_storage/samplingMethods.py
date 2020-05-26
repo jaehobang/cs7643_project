@@ -57,7 +57,7 @@ class MiddleEncounterMethod(SamplingMethod):
         return final_indices_list
 
 
-
+##TODO: mapping seems to be wrong when I use this method, we need to make fixes
 class MeanEncounterMethod(SamplingMethod):
 
     def __str__(self):

@@ -153,6 +153,39 @@ def sample3(images, labels, boxes, sampling_rate = 30):
     assert(len(reference_indexes) == len(images))
     return images[::sampling_rate], labels[::sampling_rate], boxes[::sampling_rate], reference_indexes
 
+
+
+def sample3_middle(images, labels, boxes, sampling_rate = 30):
+    ## for uniform sampling, we will say all the frames until the next selected from is it's 'property'
+    reference_indexes = []
+    length = len(images[::sampling_rate])
+
+    if sampling_rate % 2 == 1:
+        start = -(sampling_rate // 2)
+        end = sampling_rate // 2
+    else:
+        start = -(sampling_rate // 2)
+        end = sampling_rate // 2 - 1
+
+    print(f"{sampling_rate} {start} {end}")
+    for i in range(length):
+        for j in range(start, end + 1):
+            if (i * sampling_rate + j) < 0:
+                continue
+            if i * sampling_rate + j >= len(images):
+                break
+            reference_indexes.append(i)
+
+    while len(reference_indexes) != len(images):
+        reference_indexes.append(length - 1)
+
+
+
+    print(f"{len(reference_indexes)} {len(images)}")
+    assert(len(reference_indexes) == len(images))
+    return images[::sampling_rate], labels[::sampling_rate], boxes[::sampling_rate], reference_indexes
+
+
 """
 def convert_labels_to_binary(dataset):
     
@@ -214,7 +247,7 @@ if __name__ == "__main__":
 
     """
     loader = JacksonLoader()
-    images = loader.load_images(image_size = 300)
+    images = loader.load_images()
 
     ## we want to filter out only the ones that we want to use
     from others.amdegroot.data.jackson import JACKSON_CLASSES
@@ -226,7 +259,7 @@ if __name__ == "__main__":
     sampling_rate = int(len(images) / total_eval_num)
 
     ## let's sample images
-    images_us, labels_us, boxes_us, mapping = sample3(images, labels, boxes, sampling_rate = sampling_rate)
+    images_us, labels_us, boxes_us, mapping = sample3_middle(images, labels, boxes, sampling_rate = sampling_rate)
 
 
     evaluate_with_gt(images, labels, boxes, images_us, labels_us, boxes_us, mapping, JACKSON_CLASSES)

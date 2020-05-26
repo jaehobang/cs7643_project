@@ -68,7 +68,7 @@ def evaluate_with_gt(images, labels, boxes, rep_images, rep_labels, rep_boxes, m
         score = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
         print(f"key: {key}, score: {score}")
 
-    return
+    return sampled_propagated_predicted_labels, all_gt_labels
 
 
 
