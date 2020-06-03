@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
 import skimage.measure
-
+import torch
 
 
 
@@ -21,10 +21,40 @@ class VGG16Method(FeatureExtractionMethod):
 
     def run(self, images, desired_vector_size):
         import torchvision.models as models
+        #import os
+        #os.environ["CUDA_VISIBLE_DEVICES"] = "1"  ## we want to run everything on gpu 1
+
         vgg16 = models.vgg16(pretrained = True)
+        vgg16.cuda()
+        images_torch = torch.Tensor(images)
+        images_torch = images_torch.permute(0,3,1,2)
+        data_loader = torch.utils.data.DataLoader(images_torch, batch_size = 32, shuffle = False)
+        outputs = []
+        for i, data_pack in enumerate(data_loader):
+            image_batch = data_pack
+            image_batch = image_batch.cuda()
+            output = vgg16.features(image_batch)
+            output = output.cpu()
+            output_np = output.detach().numpy() #n, 512, 9, 9
 
 
-        pass
+            outputs.append( np.sum(output_np, axis = 1) )
+
+        images_reshaped = np.concatenate(outputs, axis = 0)
+        images_reshaped = images_reshaped.reshape(images_reshaped.shape[0], images_reshaped.shape[1] * images_reshaped.shape[2])
+
+        if images_reshaped.shape[1] > desired_vector_size:
+            return images_reshaped[:,:desired_vector_size]
+
+        elif images_reshaped.shape[1] < desired_vector_size:
+            tmp = np.ndarray(shape = (images_reshaped.shape[0], desired_vector_size - images_reshaped.shape[1]))
+            images_reshaped = np.concatenate([images_reshaped, tmp], axis = 1)
+            return images_reshaped
+
+        else: ## images_reshaped.shape[1] == desired_vector_size
+            return images_reshaped
+
+
 
 
 class DownSampleMaxMethod(FeatureExtractionMethod):
