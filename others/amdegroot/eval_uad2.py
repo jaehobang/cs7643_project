@@ -169,8 +169,10 @@ def write_voc_results_file(all_boxes, dataset):
     :return:
     """
     for cls_ind, cls in enumerate(labelmap):
-        print('Writing {:s} UAD results file'.format(cls))
+        print('Writing {:s} results file'.format(cls))
         filename = get_voc_results_file_template(set_type, cls)
+        print(f"Path it is written to is {filename}")
+
         with open(filename, 'wt') as f:
             ## in the case of uad, image id is same as index...
             for i in range(len(dataset)):

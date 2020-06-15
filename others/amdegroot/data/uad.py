@@ -84,6 +84,8 @@ class UADDetection(data.Dataset):
         self.image_height = -1
         self.logger = Logger()
         self.eval = eval
+        self.y_train = None
+        self.X_train = None
 
 
     def __getitem__(self, index):
@@ -132,11 +134,14 @@ class UADDetection(data.Dataset):
 
         img = self.X_train[index]
         height, width, _ = img.shape
-        labels = self.y_train[index]
+        if self.y_train is None:
+            labels = None
+        else:
+            labels = self.y_train[index]
+
         boxes = self.y_train_boxes[index]
         if self.target_transform is not None:
             target = self.target_transform(boxes, labels, width, height)
-            ## TODO: will there be cases where you don't use the target transform?? The original target seems to be ETree of the annotation
         if self.transform is not None:
             ## we expect this code to run only if target_trans
             target = np.array(target)
@@ -176,6 +181,10 @@ class UADDetection(data.Dataset):
             list:  [img_id, [(label, bbox coords),...]]
                 eg: ('001718', [('dog', (96, 13, 438, 332))])
         '''
+        if self.y_train is None:
+            return None
+
+
         ## we need to convert the annotation into this format
         ret = [str(index)]
         targets = []

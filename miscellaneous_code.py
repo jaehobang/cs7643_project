@@ -1,0 +1,179 @@
+
+#### draw multiple figures with plt #####
+
+import numpy as np
+import matplotlib.pyplot as plt
+import torch
+import cv2
+
+
+def draw_multiple_images(images):
+    w=10
+    h=10
+    size = 20
+    fig=plt.figure(figsize=(size, size))
+    columns = 4
+    rows = 5
+    for i in range(1, columns*rows +1):
+        #img = np.random.randint(10, size=(h,w))
+        fig.add_subplot(rows, columns, i)
+        plt.imshow(images[i])
+    plt.show()
+
+
+def generate_video(images, save_dir, fps, frame_width, frame_height, code = 'XVID'):
+    fourcc = cv2.VideoWriter_fourcc(*code)
+    out = cv2.VideoWriter(save_dir, fourcc, fps, (frame_width, frame_height))
+
+    for i, frame in enumerate(images):
+        out.write(frame)
+
+    out.release()
+
+    return
+
+
+
+#### drawing patches
+
+# img: img to draw the patches on
+# patches: list of rectangle points to draw
+def draw_patches(img, patches, labels = None, format='ml'):
+    import cv2
+    new_img = np.copy(img)
+    if labels is not None:
+        ## we assume this is used for 'car', 'bus', 'others', 'van'
+        colors = {'car': (0,0,255),'bus': (255, 0, 0),'others': (0, 255, 0),'van': (255, 255, 0)}
+    else:
+        color = (0,0,255)
+    if format == 'cv':
+        if patches is not None:
+            for i in range(len(patches)):
+                if labels:
+                    color = colors[labels[i]]
+                cv2.rectangle(new_img, (int(patches[i][0]), int(patches[i][1])), \
+                              (int(patches[i][0] + patches[i][2]), int(patches[i][1] + patches[i][3])), color, 2)
+
+    if format == 'ml':
+        if patches is not None:
+            for i in range(len(patches)):
+                if labels:
+                    color = colors[labels[i]]
+                cv2.rectangle(new_img, (int(patches[i][0]), int(patches[i][1])), \
+                              (int(patches[i][2]), int(patches[i][3])), color, 2)
+
+    return new_img
+
+### creating dataLoader object for evaluation
+def createTorchDataLoader(images, batch_size = 16, shuffle = False):
+    import torch
+    dataset = PytorchDataset(transform = PytorchTransform())
+    dataset.set_images(images)
+    dataset.set_target_images(None)
+    return torch.utils.data.DataLoader(images, batch_size=batch_size, shuffle=shuffle, num_workers=4)
+
+
+class PytorchDataset(torch.utils.data.Dataset):
+    """`MS Coco Detection <http://mscoco.org/dataset/#detections-challenge2016>`_ Dataset.
+    Args:
+        root (string): Root directory where images are downloaded to.
+        set_name (string): Name of the specific set of COCO images.
+        transform (callable, optional): A function/transform that augments the
+                                        raw images`
+        target_transform (callable, optional): A function/transform that takes
+        in the target (bbox) and transforms it.
+    """
+    def __init__(self, transform=None):
+
+        self.transform = transform
+
+        self.root = ""
+        self.image_width = -1
+        self.image_height = -1
+        self.X_train = None
+        self.y_train = None
+
+    def __getitem__(self, index):
+        """
+        Function that is called when doing enumeration / using dataloader
+        :param index:
+        :return:
+        """
+        return self.pull_item(index)
+
+    def set_images(self, images):
+        self.X_train = images
+
+    def set_target_images(self, target_images):
+        self.y_train = target_images
+
+    def provide_args(self):
+        return None
+
+    def pull_item(self, index):
+        """
+        Args:
+            index (int): Index
+        Returns:
+            tuple: Tuple (image, target, height, width).
+                   target is the object returned by ``coco.loadAnns``.
+        """
+        img = self.X_train[index]
+        args = self.provide_args()
+        if self.transform is not None:
+            ## we expect this code to run only if target_trans
+            img = self.transform(img, args)
+
+        if self.y_train is not None:
+            target = self.y_train[index]
+
+        return torch.from_numpy(img).permute(2, 0, 1), torch.from_numpy(target)
+
+
+    def pull_image(self, index):
+        '''Returns the original image object at index in PIL form
+
+        Note: not using self.__getitem__(), as any transformations passed in
+        could mess up this functionality.
+
+        Argument:
+            index (int): index of img to show
+        Return:
+            cv2 img
+        '''
+        return self.X_train[index] ## note this images is BRG
+
+
+    def __len__(self):
+        return len(self.X_train)
+
+
+class PytorchTransform:
+    """
+        BaseTransform will perform the following operations:
+        1. Avg -- convert the image to grayscale
+        2. Normalize -- arrange all pixel values to be between 0 and 1
+        3. Resize -- resize the images to fit the network specifications
+    """
+    def __init__(self, size):
+        self.size = size
+
+    def transform(self, image, args):
+        mean, std = args
+        ### resize, normalize
+        size = self.size
+        x = cv2.resize(image, (size, size)).astype(np.float32)
+        x -= mean
+        x /= std
+        x = x.astype(np.float32)
+        y = np.copy(x)
+        y = np.mean(y, axis=2)
+
+        ## we need a transform for the output as well
+        ## make the base_transform return 2 different objects
+
+        return x, y
+
+    def __call__(self, image, args):
+        return self.transform(image, args)
+

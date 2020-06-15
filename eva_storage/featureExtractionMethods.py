@@ -26,6 +26,7 @@ class VGG16Method(FeatureExtractionMethod):
 
         vgg16 = models.vgg16(pretrained = True)
         vgg16.cuda()
+        torch.set_default_tensor_type('torch.FloatTensor')
         images_torch = torch.Tensor(images)
         images_torch = images_torch.permute(0,3,1,2)
         data_loader = torch.utils.data.DataLoader(images_torch, batch_size = 32, shuffle = False)

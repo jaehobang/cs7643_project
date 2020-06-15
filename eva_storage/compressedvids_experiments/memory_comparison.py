@@ -31,7 +31,6 @@ def generate_video(images, save_dir, fps, frame_width, frame_height, code = 'XVI
     for i,frame in enumerate(images):
         out.write(frame)
 
-
     out.release()
 
     return

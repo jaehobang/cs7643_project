@@ -3,6 +3,9 @@ from others.amdegroot.eval_uad2 import *  ## we import all the functions from he
 from others.amdegroot.data.uad import UAD_ROOT, UADAnnotationTransform, UADDetection
 #from others.amdegroot.data.uad import UAD_CLASSES as labelmap
 from sklearn.metrics import accuracy_score
+import sklearn.metrics as metrics ## we will use precision_score, recall_score, f1_score
+
+
 
 
 def convert_labels_to_binary(dataset, labelmap):
@@ -30,12 +33,76 @@ def propagate_labels(sampled_predicted_labels: dict, mapping):
     ## we propagate the labels from sampling to all frames
     new_dict = {}
     for key, value in sampled_predicted_labels.items():
-        print(f"{key}, type of key {type(key)}")
+        #print(f"{key}, type of key {type(key)}")
         new_dict[key] = np.zeros(len(mapping))
         for i in range(len(mapping)):
             new_dict[key][i] = sampled_predicted_labels[key][mapping[i]]
 
     return new_dict
+
+
+def evaluate_with_gt3(labels, rep_labels, mapping):
+    """
+    This function differs from evaluate with gt in the aspect that we have already converted things to binary
+
+    :param images:
+    :param labels:
+    :param boxes:
+    :param rep_images:
+    :param rep_labels:
+    :param rep_boxes:
+    :param mapping:
+    :param labelmap:
+    :return:
+    """
+
+    all_gt_labels = {}
+    all_gt_labels['foo'] = labels
+
+    all_rep_labels = {}
+    all_rep_labels['foo'] = rep_labels
+
+    sampled_propagated_predicted_labels = propagate_labels(all_rep_labels, mapping)
+
+    for key, value in all_gt_labels.items():
+        accuracy = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        precision = metrics.precision_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        recall = metrics.recall_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        f1_score = metrics.f1_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        print(f"key: {key}, accuracy: {accuracy}, precision: {precision}, recall: {recall}, f1_score: {f1_score}")
+
+    return sampled_propagated_predicted_labels, all_gt_labels
+
+
+
+def evaluate_with_gt2(labels, rep_labels, mapping):
+    """
+    This function differs from evaluate with gt in the aspect that we have already converted things to binary
+
+    :param images:
+    :param labels:
+    :param boxes:
+    :param rep_images:
+    :param rep_labels:
+    :param rep_boxes:
+    :param mapping:
+    :param labelmap:
+    :return:
+    """
+    all_gt_labels = {}
+    all_gt_labels['foo'] = labels
+
+    all_rep_labels = {}
+    all_rep_labels['foo'] = rep_labels
+
+    sampled_propagated_predicted_labels = propagate_labels(all_rep_labels, mapping)
+
+    for key, value in all_gt_labels.items():
+        score = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        print(f"key: {key}, score: {score}")
+
+    return sampled_propagated_predicted_labels, all_gt_labels
+
 
 
 

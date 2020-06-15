@@ -13,6 +13,8 @@ from others.amdegroot.eval_uad2 import * ## we import all the functions from her
 from others.amdegroot.data.uad import UAD_ROOT, UADAnnotationTransform, UADDetection
 from others.amdegroot.data.uad import UAD_CLASSES as labelmap
 from eva_storage.sampling_experiments.sampling_utils import *
+from others.amdegroot.data.uad import UAD_CLASSES
+
 
 
 logger = Logger()
@@ -22,7 +24,19 @@ logger = Logger()
 
 #################################################################################################
 #################################################################################################
+def get_cluster_labels(mapping):
+    cluster_labels = np.zeros(len(mapping), dtype = np.int)
+    cluster_i = 0
+    seen_mappings = dict()
+    for i, m in enumerate(mapping):
+        if m in seen_mappings:
+            cluster_labels[i] = seen_mappings[m]
+        else:
+            cluster_labels[i] = cluster_i
+            seen_mappings[m] = cluster_i
+            cluster_i += 1
 
+    return cluster_labels
 
 def gather_labels_by_frame(detpath, classname, class_recs, npos, image_count, ovthresh=0.5,  use_07_metric=True):
     """rec, prec, ap = voc_eval(detpath,
@@ -236,6 +250,8 @@ def create_dummy_boxes(labels):
 
 if __name__ == "__main__":
     total_eval_num = 100
+    print(f"total number of eval frames is {total_eval_num}")
+
     """
     loader = UADetracLoader()
     ## we assume the skip rate is 15, but in essence, we are performing uniform sampling once every 4 images
@@ -246,15 +262,22 @@ if __name__ == "__main__":
     images, labels, boxes = loader.filter_input3(images, labels, boxes)
 
     """
-    loader = JacksonLoader()
-    images = loader.load_images()
+    #loader = JacksonLoader()
+    #images = loader.load_images()
 
     ## we want to filter out only the ones that we want to use
-    from others.amdegroot.data.jackson import JACKSON_CLASSES
-    labels = loader.load_labels(relevant_classes = JACKSON_CLASSES)
+    #from others.amdegroot.data.jackson import JACKSON_CLASSES
+    #labels = loader.load_labels(relevant_classes = JACKSON_CLASSES)
 
-    images, labels = loader.filter_input(images, labels)
-    boxes = create_dummy_boxes(labels)
+    #images, labels = loader.filter_input(images, labels)
+    #boxes = create_dummy_boxes(labels)
+
+    loader = UADetracLoader()
+    images = loader.load_images(dir='/nethome/jbang36/eva_storage/data/ua_detrac/test_images')
+    test_labels, test_boxes = loader.load_labels(dir='/nethome/jbang36/eva_storage/data/ua_detrac/test_xml')
+    labels = test_labels['vehicle']
+    images, labels, boxes = loader.filter_input3(images, labels, test_boxes)
+    labelmap = UAD_CLASSES
 
     sampling_rate = int(len(images) / total_eval_num)
 
@@ -262,8 +285,8 @@ if __name__ == "__main__":
     images_us, labels_us, boxes_us, mapping = sample3_middle(images, labels, boxes, sampling_rate = sampling_rate)
 
 
-    evaluate_with_gt(images, labels, boxes, images_us, labels_us, boxes_us, mapping, JACKSON_CLASSES)
-
+    evaluate_with_gt(images, labels, boxes, images_us, labels_us, boxes_us, mapping, labelmap)
+    #evaluate_with_gt2(labels, labels_us, mapping)
 
 
     """

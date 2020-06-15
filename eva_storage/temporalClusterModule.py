@@ -15,14 +15,15 @@ import numpy as np
 
 class TemporalClusterModule:
 
-    def __init__(self, downsample_method= DownSampleSkippingMethod(), sampling_method=MiddleEncounterMethod()):
+    def __init__(self, downsample_method= DownSampleSkippingMethod(), sampling_method=MiddleEncounterMethod(),
+                        vector_size = 100):
         self.ac = None
         self.sampling_method = sampling_method
         self.downsample_method = downsample_method
-        self.vector_size = 100
+        self.vector_size = vector_size
         self.logger = Logger()
 
-    def run(self, images, number_of_clusters, number_of_neighbors = 3):
+    def run(self, images, number_of_clusters, number_of_neighbors = 3, linkage='ward'):
         """
         :param image_compressed:
         :param fps:
@@ -37,7 +38,7 @@ class TemporalClusterModule:
 
         connectivity = self.generate_connectivity_matrix(image_compressed, number_of_neighbors)
         self.ac = AgglomerativeClustering(n_clusters=number_of_clusters, connectivity=connectivity,
-                                          linkage='ward')
+                                          linkage=linkage)
         labels = self.ac.fit_predict(image_compressed)
         self.logger.info(f"Time to fit {n_samples}: {time.perf_counter() - start_time} (sec)")
         self.logger.info(f"Sampling frames based on {str(self.sampling_method)} strategy")
