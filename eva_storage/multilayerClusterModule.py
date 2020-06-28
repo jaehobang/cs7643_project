@@ -6,6 +6,15 @@ from logger import Logger
 from eva_storage.samplingMethods import MiddleEncounterMethod
 from eva_storage.featureExtractionMethods import DownSampleMeanMethod, DownSampleSkippingMethod
 import numpy as np
+import os
+
+
+"""
+In this file, we define our multi-level clustering technique that will be used to compress the video
+1. Implement the multi-layer representative frame structure
+2. Output the tree format into cache / something easily readable
+3. Implement our custom video compression / decompression technique
+"""
 
 # Assume you have compressed images: images_compressed
 # original_images -> images_compressed (output of the encoder network)
@@ -13,7 +22,7 @@ import numpy as np
 
 
 
-class TemporalClusterModule:
+class MultilayerClusterModule:
 
     def __init__(self, downsample_method= DownSampleSkippingMethod(), sampling_method=MiddleEncounterMethod(),
                         vector_size = 100):
@@ -23,7 +32,7 @@ class TemporalClusterModule:
         self.vector_size = vector_size
         self.logger = Logger()
 
-    def run(self, images, number_of_clusters, number_of_neighbors = 3, linkage='ward'):
+    def run(self, images, number_of_clusters, number_of_neighbors = 3, linkage='ward', tree_save_dir = None):
         """
         :param image_compressed:
         :param fps:
@@ -37,15 +46,26 @@ class TemporalClusterModule:
         image_compressed = self.downsample_method.run(images, self.vector_size)
 
         connectivity = self.generate_connectivity_matrix(image_compressed, number_of_neighbors)
+        if not tree_save_dir:
+            tree_save_dir = '/nethome/jbang36/eva_jaeho/eva_storage/joblib'
+
+        ## make sure the directory exists
+        assert(os.path.isdir(tree_save_dir))
         self.ac = AgglomerativeClustering(n_clusters=number_of_clusters, connectivity=connectivity,
-                                          linkage=linkage)
+                                          linkage=linkage, memory = tree_save_dir)
         labels = self.ac.fit_predict(image_compressed)
         self.logger.info(f"Time to fit {n_samples}: {time.perf_counter() - start_time} (sec)")
         self.logger.info(f"Sampling frames based on {str(self.sampling_method)} strategy")
+        self.logger.info(f"tree structure joblib saved as {tree_save_dir}")
         rep_indices = self.sampling_method.run(labels, image_compressed) ## we also need to get the mapping from this information
 
 
         return image_compressed[rep_indices], rep_indices, labels
+
+    def get_cluster_object(self):
+        return self.ac
+
+
 
 
     def generate_connectivity_matrix(self, image_compressed, number_of_neighbors = 5):

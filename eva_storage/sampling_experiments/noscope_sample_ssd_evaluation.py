@@ -59,7 +59,7 @@ def sample3(images, labels, boxes, sampling_rate=30):
 
 
 
-def get_rep_indices(images, t_diff, delta_diff):
+def get_rep_indices_noscope(images, t_diff, delta_diff):
     """
 
     :param images: are already SAMPLED IMAGES -- around 3600 ish
@@ -69,12 +69,13 @@ def get_rep_indices(images, t_diff, delta_diff):
     ## we will be using a MSE evaluation method
     rep_frames_indices = [0]
     mapping = [0]
+
     curr_ref = 0
 
-    for i in range(0, len(images) - 1, t_diff):
-        mse_error = np.square(np.subtract(images[i], images[i+1])).mean()
+    for i in range(0, len(images) - t_diff, t_diff):
+        mse_error = np.square(np.subtract(images[i], images[i+t_diff])).mean()
         if mse_error > delta_diff:
-            rep_frames_indices.append(i+1)
+            rep_frames_indices.append(i+t_diff)
             curr_ref += 1
             mapping.append(curr_ref)
         else:
@@ -127,32 +128,32 @@ def get_final_mapping(mapping, skip_rate, original_image_count):
 #######
 
 def set_frame_count(wanted_frame_count, images, initial_t_diff, initial_delta_diff):
-    error_bound = 50
-    rep_frame_indices, mapping = get_rep_indices(images, initial_t_diff, initial_delta_diff)
+    error_bound = 0.05 ## we give in percentage, frame count needs to be within this bound
+    rep_frame_indices, mapping = get_rep_indices_noscope(images, initial_t_diff, initial_delta_diff)
     curr_delta_diff = initial_delta_diff
     curr_t_diff = initial_t_diff
     up = False
     down = False
-    change_rate = 100
-    change_rate_down = 10
+    change_rate = 0.1
+    change_rate_down = 0.1 ### think these numbers should be in percentage....
     print(f"Number of total frames {len(images)}")
 
     while True:
-        if len(rep_frame_indices) > wanted_frame_count + error_bound:
-            curr_delta_diff += change_rate
-            rep_frame_indices, mapping = get_rep_indices(images, curr_t_diff, curr_delta_diff)
+        if len(rep_frame_indices) > wanted_frame_count * (1 + error_bound):
+            curr_delta_diff *= (1 + change_rate)
+            rep_frame_indices, mapping = get_rep_indices_noscope(images, curr_t_diff, curr_delta_diff)
             print(f"UP: {curr_delta_diff} length: {len(rep_frame_indices)}")
             up = True
-        elif len(rep_frame_indices) < wanted_frame_count - error_bound:
-            curr_delta_diff -= change_rate_down
-            rep_frame_indices, mapping = get_rep_indices(images, curr_t_diff, curr_delta_diff)
+        elif len(rep_frame_indices) < wanted_frame_count * ( 1- error_bound):
+            curr_delta_diff *= ( 1- change_rate_down)
+            rep_frame_indices, mapping = get_rep_indices_noscope(images, curr_t_diff, curr_delta_diff)
             print(f"DOWN: {curr_delta_diff} length: {len(rep_frame_indices)}")
             down = True
         else:
             break
 
         if up and down:
-            ## we don't want the while loop to run forever, this parameter searching method is very rudimentary
+            ## break if it goes back and forth
             break
 
 
@@ -165,7 +166,6 @@ if __name__ == "__main__":
     import os
 
 
-    os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     skip_rate = 15
     t_diff = 1 ##TODO: we need to experiment with this as well but since we have skip_rate of 15, I think it will be okay
     delta_diff = 60  ##TODO: we need to modify this parameter (experiments in NoScope is probably using normalized images

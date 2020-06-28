@@ -45,31 +45,38 @@ class UADetracConverter:
     def convert2limit_queries2(labels, category_dict, operator = 'and'):
         ## assumption for labels is [['car', 'bus', ...'], ['car', 'bus', ...]]
         count_dict = {}
-        for key in category_dict:
-            count_dict[key] = 0
+
 
         new_labels = []
-        for label in labels:
-            if label is None:
-                new_labels.append(None)
+        for i, label in enumerate(labels):
+            for key in category_dict:
+                count_dict[key] = 0
+
+            if not label:
+                new_labels.append(0)
             else:
                 for veh in label:
                     if veh not in category_dict.keys():
-                        print(f"unforeseen vehicle type: {veh}")
                         continue
                     else:
-                        count_dict[key] += 1
+                        count_dict[veh] += 1
 
                 if operator == 'and':
                     condition = True
                     for key in category_dict.keys():
                         if count_dict[key] < category_dict[key]:
                             condition = False
+
+
+
                 elif operator == 'or':
                     condition = False
                     for key in category_dict.keys():
                         if count_dict[key] >= category_dict[key]:
                             condition = True
+
+
+
                 if condition:
                     new_labels.append(1)
                 else:

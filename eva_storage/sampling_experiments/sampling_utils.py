@@ -65,6 +65,7 @@ def evaluate_with_gt3(labels, rep_labels, mapping):
     sampled_propagated_predicted_labels = propagate_labels(all_rep_labels, mapping)
 
     for key, value in all_gt_labels.items():
+        print(f"gt_labels len: {len(all_gt_labels[key])}, propagated_labels len: {len(sampled_propagated_predicted_labels[key])}")
         accuracy = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
         precision = metrics.precision_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
         recall = metrics.recall_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
@@ -294,3 +295,21 @@ def create_dummy_boxes(labels):
             box_frame.append((0,0,0,0))
         boxes.append(box_frame)
     return boxes
+
+
+"""
+This function is used by uniform sampling to generate the fake clusters for evaluation purposes
+"""
+def get_cluster_labels(mapping):
+    cluster_labels = np.zeros(len(mapping), dtype = np.int)
+    cluster_i = 0
+    seen_mappings = dict()
+    for i, m in enumerate(mapping):
+        if m in seen_mappings:
+            cluster_labels[i] = seen_mappings[m]
+        else:
+            cluster_labels[i] = cluster_i
+            seen_mappings[m] = cluster_i
+            cluster_i += 1
+
+    return cluster_labels

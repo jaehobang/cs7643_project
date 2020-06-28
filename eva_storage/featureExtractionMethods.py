@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import skimage.measure
 import torch
-
+import math
 
 
 class FeatureExtractionMethod(ABC):
@@ -58,6 +58,60 @@ class VGG16Method(FeatureExtractionMethod):
 
 
 
+class BackgroundSubtractionMethod(FeatureExtractionMethod):
+
+    def __str__(self):
+        return "Extract features after using background subtraction"
+
+    def run(self, images, desired_vector_size, debug = False):
+        import cv2
+        # fgbg only takes grayscale images, we need to convert
+        ## check if image is already converted to grayscale -> channels = 1
+
+        segmented_images = np.ndarray(shape=(images.shape[0], images.shape[1], images.shape[2]), dtype=np.uint8)
+        print(f"segmented_images shape will be {segmented_images.shape}")
+        history = 40
+        dist2Threshold = 300
+        detectShadows = False
+        fgbg = cv2.createBackgroundSubtractorKNN(history=history, dist2Threshold=dist2Threshold,
+                                                 detectShadows=detectShadows)
+
+        # first round is to tune the values of the background subtractor
+        for ii in range(10):
+            image_gray = np.mean(images[ii], axis = 2).astype(np.uint8)
+            fgbg.apply(image_gray)
+
+
+        for ii in range(len(images)):
+            image_gray = np.mean(images[ii], axis = 2).astype(np.uint8)
+            segmented_images[ii] = fgbg.apply(image_gray)
+
+        ## after we generate the segmented_images, we need to downsample this somehow...
+        ## first step, let's just downsample
+        import math
+        wanted_width = int(math.sqrt(desired_vector_size))
+        wanted_height = desired_vector_size // wanted_width
+        width_skip_rate = images.shape[1] // wanted_width
+        height_skip_rate = images.shape[2] // wanted_height
+        images_downscaled = segmented_images[:, ::width_skip_rate, ::height_skip_rate]
+        print(f"segmented images shape {segmented_images.shape}")
+        print(f"images_downsampled shape {images_downscaled.shape}")
+        ## we need to cut off the last element
+        if images_downscaled.shape[1] > wanted_height:
+            images_downscaled = images_downscaled[:,:wanted_height,:]
+        if images_downscaled.shape[2] > wanted_width:
+            images_downscaled = images_downscaled[:,:,:wanted_width]
+        assert(images_downscaled.shape == (images.shape[0], wanted_height, wanted_width))
+
+        images_reshaped = images_downscaled.reshape(len(images), wanted_width * wanted_height)
+
+        if debug:
+            return images_reshaped, segmented_images
+
+        return images_reshaped
+
+
+
 class DownSampleMaxMethod(FeatureExtractionMethod):
 
     def __str__(self):
@@ -87,13 +141,20 @@ class DownSampleMeanMethod2(FeatureExtractionMethod):
 
     def run(self, images, desired_vector_size):
         assert(desired_vector_size % 10 == 0)
-        wanted_width = 10
+        wanted_width = int(math.sqrt(desired_vector_size))
         wanted_height = desired_vector_size // wanted_width
         height_box_size = images.shape[1] // wanted_height
         width_box_size = images.shape[2] // wanted_width
 
         images_reshaped = skimage.measure.block_reduce(images, (1, height_box_size, width_box_size, 3), np.mean)
         images_reshaped = np.squeeze(images_reshaped, axis = 3)
+
+        ## we need to cut things off if they overflow
+        if images_reshaped.shape[1] > wanted_height:
+            images_reshaped = images_reshaped[:, :wanted_height, :]
+        if images_reshaped.shape[2] > wanted_width:
+            images_reshaped = images_reshaped[:, :, :wanted_width]
+
         images_reshaped = images_reshaped.reshape(len(images), wanted_height * wanted_width)
 
         return images_reshaped
@@ -108,7 +169,8 @@ class DownSampleMeanMethod(FeatureExtractionMethod):
 
     def run(self, images, desired_vector_size):
         assert(desired_vector_size % 10 == 0)
-        wanted_width = 10
+        import math
+        wanted_width = int(math.sqrt(desired_vector_size)) ## will modify this to
         wanted_height = desired_vector_size // wanted_width
         height_box_size = images.shape[1] // wanted_height
         width_box_size = images.shape[2] // wanted_width

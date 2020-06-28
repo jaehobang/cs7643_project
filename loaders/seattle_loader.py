@@ -273,50 +273,6 @@ class SeattleLoader(AbstractLoader):
         """
         pass
 
-    """
-    def save_labels(self, name):
-        save_dir = os.path.join(self.eva_dir, 'data', args.cache_path, name)
-        if self.labels is None:
-            self.logger.error("No labels loaded, call load_labels() first")
-
-        elif type(self.labels) is dict:
-            np.save(save_dir, self.labels, allow_pickle=True)
-            self.logger.info(f"saved labels to {save_dir}")
-
-        else:
-            self.logger.error(f"Expected labels type to be dict, got {type(self.labels)}")
-
-    def save_boxes(self, name=args.cache_box_name):
-        save_dir = os.path.join(self.eva_dir, 'data', args.cache_path, name)
-        if self.images is None:
-            self.logger.error("No labels loaded, call load_boxes() first")
-
-        elif type(self.images) is np.ndarray:
-            np.save(save_dir, self.boxes)
-            self.logger.info(f"saved boxes to {save_dir}")
-
-        else:
-            self.logger.error("Labels type is not np....cannot save")
-
-    def load_cached_images(self, name=args.cache_image_name, vi_name=args.cache_vi_name):
-        save_dir = os.path.join(self.eva_dir, 'data', args.cache_path, name)
-        save_dir_vi = os.path.join(self.eva_dir, 'data', args.cache_path, vi_name)
-        self.images = np.load(save_dir)
-        self.video_start_indices = np.load(save_dir_vi)
-        return self.images
-
-    def load_cached_boxes(self, name=args.cache_box_name):
-        save_dir = os.path.join(self.eva_dir, 'data', args.cache_path, name)
-        self.boxes = np.load(save_dir, allow_pickle=True)
-        return self.boxes
-
-    def load_cached_labels(self, name=args.cache_label_name):
-        save_dir = os.path.join(self.eva_dir, 'data', args.cache_path, name)
-        labels_pickeled = np.load(save_dir, allow_pickle=True)
-        self.labels = labels_pickeled.item()
-        return self.labels
-    """
-
 if __name__ == "__main__":
     import time
 

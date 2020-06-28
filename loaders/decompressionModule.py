@@ -35,6 +35,9 @@ class DecompressionModule:
     def get_frame_count(self):
         return self.video_stats[self.curr_video]['frame_count']
 
+    def get_iframes(self, path, frame_count_limit = 60000):
+        pass
+
 
     def convert2images(self, path, frame_count_limit = 60000):
         self.vid_ = cv2.VideoCapture(path)

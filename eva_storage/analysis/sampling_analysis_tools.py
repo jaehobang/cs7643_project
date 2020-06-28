@@ -138,7 +138,10 @@ def f1_by_cluster(predicted_labels, gt_labels, all_cluster_labels):
             fn_arr = np.logical_and(np.logical_not(pred_cluster_i), gt_cluster_i)
             fp_arr = np.logical_and(pred_cluster_i, np.logical_not(gt_cluster_i))
             if not (sum(tp_arr) == 0 and sum(fp_arr) == 0 and sum(fn_arr) == 0):
-                print(f"[{cluster_num}] size: {len(tp_arr)} predicted 1: {sum(pred_cluster_i)}, actual 1: {sum(gt_cluster_i)}, tp: {sum(tp_arr)}, fp: {sum(fp_arr)}, fn: {sum(fn_arr)}")
+                print(f"[{cluster_num}] size: {len(tp_arr)} predicted 1: {sum(pred_cluster_i)}, "
+                      f"actual 1: {sum(gt_cluster_i)}, tp: {sum(tp_arr)} ({sum(tp_arr) / len(tp_arr)}), "
+                      f"fp: {sum(fp_arr)} ({sum(fp_arr) / len(fp_arr)}), "
+                      f"fn: {sum(fn_arr)} ({sum(fn_arr) / len(fn_arr)})")
 
             if sum(tp_arr) == 0 and sum(fn_arr) == 0 and sum(fp_arr) == 0:
                 #print(f"cluster num: {cluster_num} does not have tp")
