@@ -15,6 +15,7 @@ from others.amdegroot.data import BaseTransform
 import torch.backends.cudnn as cudnn
 from timer import Timer
 import numpy as np
+from others.amdegroot.train_uad import train_with_args
 
 
 
@@ -46,7 +47,12 @@ class SSDLoader:
             net.train()
         return net
 
-    def detect(self, images, **kwargs):
+    def train(self, images, labels, **kwargs):
+        self.model.train()
+        train_with_args(self.model, images, labels, **kwargs)
+
+
+    def predict(self, images, **kwargs):
         if 'dataset_mean' in kwargs.keys() and \
                 (type(kwargs['dataset_mean']) == list or type(kwargs['dataset_mean']) == tuple):
             dataset_mean = kwargs['dataset_mean']

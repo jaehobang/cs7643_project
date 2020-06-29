@@ -7,23 +7,52 @@ import torch
 import cv2
 
 
-def draw_multiple_images(images):
-    w=10
-    h=10
-    size = 20
-    fig=plt.figure(figsize=(size, size))
+def draw_multiple_images_w_boxes(images, boxes):
     columns = 4
-    rows = 5
+    images_num = len(images)
+    row_limit = 100
+    rows = min(int(images_num / columns), row_limit)
+    print(f"Displaying {rows} rows")
+
+    w_size = 20
+    h_size = 4 * rows
+    fig = plt.figure(figsize=(w_size, h_size))
+
     for i in range(1, columns*rows +1):
         #img = np.random.randint(10, size=(h,w))
         fig.add_subplot(rows, columns, i)
-        plt.imshow(images[i])
+        new_image = draw_patches(images[i - 1], boxes[i - 1])
+
+        plt.imshow(new_image)
     plt.show()
 
 
-def generate_video(images, save_dir, fps, frame_width, frame_height, code = 'XVID'):
+
+def draw_multiple_images(images):
+    columns = 4
+    images_num = len(images)
+    row_limit = 100
+    rows = min(int(images_num / columns), row_limit)
+    print(f"Displaying {rows} rows")
+
+    w_size = 20
+    h_size = 4 * rows
+    fig = plt.figure(figsize=(w_size, h_size))
+
+    for i in range(1, columns*rows +1):
+        #img = np.random.randint(10, size=(h,w))
+        fig.add_subplot(rows, columns, i)
+        plt.imshow(images[i - 1])
+    plt.show()
+
+
+def generate_video(images, save_dir, fps, frame_width, frame_height, code = 'XVID', bw = False):
     fourcc = cv2.VideoWriter_fourcc(*code)
-    out = cv2.VideoWriter(save_dir, fourcc, fps, (frame_width, frame_height))
+
+    if bw:
+        out = cv2.VideoWriter(save_dir, fourcc, fps, (frame_width, frame_height), 0)
+    else:
+        out = cv2.VideoWriter(save_dir, fourcc, fps, (frame_width, frame_height))
 
     for i, frame in enumerate(images):
         out.write(frame)
@@ -70,7 +99,7 @@ def createTorchDataLoader(images, batch_size = 16, shuffle = False):
     dataset = PytorchDataset(transform = PytorchTransform())
     dataset.set_images(images)
     dataset.set_target_images(None)
-    return torch.utils.data.DataLoader(images, batch_size=batch_size, shuffle=shuffle, num_workers=4)
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4)
 
 
 class PytorchDataset(torch.utils.data.Dataset):

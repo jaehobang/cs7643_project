@@ -41,6 +41,88 @@ def propagate_labels(sampled_predicted_labels: dict, mapping):
     return new_dict
 
 
+
+
+def evaluate_with_gt4(images, labels, boxes, pimages, plabels, pboxes, labelmap):
+    gt_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
+    gt_dataset.set_images(images)
+    gt_dataset.set_labels(labels)
+    gt_dataset.set_boxes(boxes)
+
+
+    print('hello world')
+    ## need to propagate the labels
+    ## we also need to derive the gt labels for non sampled things....we just need to convert 'labels' to binary format I think
+    ## before we do that let's examine the output of all_gt_labels, all_predicted_labels
+
+    ##TODO: propagate the label and compute precision
+    p_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
+    p_dataset.set_images(pimages)
+    p_dataset.set_labels(plabels)
+    p_dataset.set_boxes(pboxes)
+
+    ## convert labels format
+    all_gt_labels = convert_labels_to_binary(gt_dataset, labelmap)
+    all_p_labels = convert_labels_to_binary(p_dataset, labelmap)
+
+    for key, value in all_gt_labels.items():
+        accuracy = accuracy_score(all_gt_labels[key], all_p_labels[key])
+        precision = metrics.precision_score(all_gt_labels[key], all_p_labels[key])
+        recall = metrics.recall_score(all_gt_labels[key], all_p_labels[key])
+        f1_score = metrics.f1_score(all_gt_labels[key], all_p_labels[key])
+        print(f"key: {key}, accuracy: {accuracy}, precision: {precision}, recall: {recall}, f1_score: {f1_score}")
+
+    data_pack = {}
+    data_pack['accuracy'] = accuracy
+    data_pack['precision'] = precision
+    data_pack['recall'] = recall
+    data_pack['f1_score'] = f1_score
+
+    return data_pack
+
+
+def evaluate_with_gt5(labels, rep_labels, mapping):
+    """
+    This function differs from evaluate with gt in the aspect that we have already converted things to binary
+
+    :param images:
+    :param labels:
+    :param boxes:
+    :param rep_images:
+    :param rep_labels:
+    :param rep_boxes:
+    :param mapping:
+    :param labelmap:
+    :return:
+    """
+
+    all_gt_labels = {}
+    all_gt_labels['foo'] = labels
+
+    all_rep_labels = {}
+    all_rep_labels['foo'] = rep_labels
+
+    sampled_propagated_predicted_labels = propagate_labels(all_rep_labels, mapping)
+
+    for key, value in all_gt_labels.items():
+        print(f"gt_labels len: {len(all_gt_labels[key])}, propagated_labels len: {len(sampled_propagated_predicted_labels[key])}")
+        accuracy = accuracy_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        precision = metrics.precision_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        recall = metrics.recall_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        f1_score = metrics.f1_score(all_gt_labels[key], sampled_propagated_predicted_labels[key])
+        print(f"key: {key}, accuracy: {accuracy}, precision: {precision}, recall: {recall}, f1_score: {f1_score}")
+
+    data_pack = {}
+    data_pack['accuracy'] = accuracy
+    data_pack['precision'] = precision
+    data_pack['recall'] = recall
+    data_pack['f1_score'] = f1_score
+
+    return data_pack
+
+
+
+
 def evaluate_with_gt3(labels, rep_labels, mapping):
     """
     This function differs from evaluate with gt in the aspect that we have already converted things to binary
@@ -313,3 +395,37 @@ def get_cluster_labels(mapping):
             cluster_i += 1
 
     return cluster_labels
+
+
+
+def sample3_middle(images, labels, boxes, sampling_rate = 30):
+    ## for uniform sampling, we will say all the frames until the next selected from is it's 'property'
+    reference_indexes = []
+    length = len(images[::sampling_rate])
+
+    if sampling_rate % 2 == 1:
+        start = -(sampling_rate // 2)
+        end = sampling_rate // 2
+    else:
+        start = -(sampling_rate // 2)
+        end = sampling_rate // 2 - 1
+
+    print(f"{sampling_rate} {start} {end}")
+    for i in range(length):
+        for j in range(start, end + 1):
+            if (i * sampling_rate + j) < 0:
+                continue
+            if i * sampling_rate + j >= len(images):
+                break
+            reference_indexes.append(i)
+
+    while len(reference_indexes) != len(images):
+        reference_indexes.append(length - 1)
+
+
+
+    print(f"{len(reference_indexes)} {len(images)}")
+    assert(len(reference_indexes) == len(images))
+    return images[::sampling_rate], labels[::sampling_rate], boxes[::sampling_rate], reference_indexes
+
+

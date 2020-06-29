@@ -1,10 +1,10 @@
 """
 We want to evaluate multiple pipelines and how they perform on an end-to-end basis
 The scenarios we want to deal with are as follows:
-UDF
-Sample -> UDF
-Filter -> UDF (PP)
-Sample -> Filter -> UDF
+UDF - DONE (udf.py)
+Sample -> UDF - DONE(udf.py)
+Filter -> UDF (PP) - CURRENT
+Sample -> Filter -> UDF - CURRENT
 
 """
 
@@ -16,6 +16,7 @@ from timer import Timer
 from eva_storage.featureExtractionMethods import *
 from eva_storage.samplingMethods import *
 from eva_storage.temporalClusterModule import *
+from loaders.pp_loader import PPLoader
 import yaml
 import os
 
@@ -32,9 +33,10 @@ def no_sampling():
 
     #### example_query = 'select * from Seattle where car == 1'
 
+
     ## we need to invoke the ssd method for evaluation and return the labels to all these frames
-    model = SSDLoader()
-    plabels, pboxes = model.detect(images)
+    pp = PPLoader()
+    plabels = pp.detect(images)
     total_time = timer.toc()
     ## we want to report the accuracy as well
     data_pack = evaluate_with_gt4(images, labels, boxes, images, plabels, pboxes, labelmap)
@@ -59,7 +61,7 @@ def uniform_sampling():
 
     ## we need to invoke the ssd method for evaluation and return the labels to all these frames
     model = SSDLoader()
-    plabels, pboxes = model.detect(images_us)
+    plabels, pboxes = model.predict(images_us)
     total_time = timer.toc()
     data_pack = evaluate_with_gt5(labels, plabels, mapping)
     data_pack['time'] = total_time
@@ -83,7 +85,7 @@ def uniform_sampling(total_eval_count = 1000):
 
     ## we need to invoke the ssd method for evaluation and return the labels to all these frames
     model = SSDLoader()
-    plabels, pboxes = model.detect(images_us)
+    plabels, pboxes = model.predict(images_us)
     total_time = timer.toc()
     data_pack = evaluate_with_gt5(labels, plabels, mapping)
     data_pack['time'] = total_time
@@ -121,7 +123,7 @@ def jnet_sampling(total_eval_count):
 
     ## we need to invoke the ssd method for evaluation and return the labels to all these frames
     model = SSDLoader()
-    plabels, pboxes = model.detect(rep_images)
+    plabels, pboxes = model.predict(rep_images)
     total_time = timer.toc()
     data_pack = evaluate_with_gt5(labels, plabels, mapping)
     data_pack['time'] = total_time
