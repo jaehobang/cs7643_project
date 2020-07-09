@@ -1,5 +1,5 @@
 """
-In this file we define a general datset used for evaluation
+In this file we define a general dataset used for evaluation
 """
 
 """UAD Dataset Classes
