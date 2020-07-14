@@ -67,14 +67,29 @@ class DecompressionModule:
         self.logger.info(f"meta data of the video {path} is {frame_count, height, width, channels}")
         self.image_matrix = np.ndarray(shape=(frame_count, height, width, channels), dtype = np.uint8)
 
+        error_indices = []
 
         for i in range(frame_count):
             success, image = self.vid_.read()
-            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             if not success:
-                print("Image retrieval has failed")
+                print(f"Image {i} retrieval has failed")
+                error_indices.append(i)
             else:
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 self.image_matrix[i, :, :, :] = image  # stored in rgb format
+
+        ### let's do error fixing
+        """
+        if len(error_indices) != 0:
+            error_indices = sorted(error_indices) ## make the lower one come first
+            for i, error_index in enumerate(error_indices):
+                ## the reason we delete the error_index - i is because this deleting mechanism is destructive
+                ## since we have already sorted the error_indices array, we are guaranteed that we have deleted the number of elements before hand
+                ## therefore, the total length of the image matrix has been decreased
+                self.image_matrix = np.delete(self.image_matrix, error_index - i, axis = 0)
+        
+        ## => I am not sure how to do this in a memory efficient way
+        """
 
         return self.image_matrix
 

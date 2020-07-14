@@ -10,7 +10,8 @@ Sample -> Filter -> UDF - CURRENT
 
 from loaders.seattle_loader import SeattleLoader
 from loaders.ssd_loader import SSDLoader
-from eva_storage.sampling_experiments.sampling_utils import evaluate_with_gt4, evaluate_with_gt5, sample3_middle
+from eva_storage.sampling_experiments.sampling_utils import evaluate_with_gt4, \
+    evaluate_with_gt5, create_dummy_boxes, sample3_middle
 from others.amdegroot.data.seattle import SEATTLE_CLASSES as labelmap
 from timer import Timer
 from eva_storage.featureExtractionMethods import *
@@ -19,6 +20,7 @@ from eva_storage.temporalClusterModule import *
 from loaders.pp_loader import PPLoader
 import yaml
 import os
+
 
 timer = Timer()
 
@@ -32,8 +34,6 @@ def no_sampling():
     labels, boxes, _ = loader.load_labels(video_directory, relevant_classes=['car', 'others', 'van'])
 
     #### example_query = 'select * from Seattle where car == 1'
-
-
     ## we need to invoke the ssd method for evaluation and return the labels to all these frames
     pp = PPLoader()
     plabels = pp.detect(images)
@@ -42,30 +42,6 @@ def no_sampling():
     data_pack = evaluate_with_gt4(images, labels, boxes, images, plabels, pboxes, labelmap)
     ### the numbers should be printed
     data_pack['time'] = total_time
-    return data_pack
-
-
-
-def uniform_sampling():
-    timer.tic()
-    video_directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2.mov'
-    sampling_rate = 30 ## fps
-
-    loader = SeattleLoader()
-    images = loader.load_images(video_directory)
-    labels, boxes, _ = loader.load_labels(video_directory, relevant_classes=['car', 'others', 'van'])
-
-    images_us, labels_us, boxes_us, mapping = sample3_middle(images, labels, boxes, sampling_rate=sampling_rate)
-
-    #### example_query = 'select * from Seattle where car == 1'
-
-    ## we need to invoke the ssd method for evaluation and return the labels to all these frames
-    model = SSDLoader()
-    plabels, pboxes = model.predict(images_us)
-    total_time = timer.toc()
-    data_pack = evaluate_with_gt5(labels, plabels, mapping)
-    data_pack['time'] = total_time
-
     return data_pack
 
 
@@ -84,13 +60,29 @@ def uniform_sampling(total_eval_count = 1000):
     #### example_query = 'select * from Seattle where car == 1'
 
     ## we need to invoke the ssd method for evaluation and return the labels to all these frames
-    model = SSDLoader()
-    plabels, pboxes = model.predict(images_us)
-    total_time = timer.toc()
-    data_pack = evaluate_with_gt5(labels, plabels, mapping)
-    data_pack['time'] = total_time
+    timer.tic()
+    video_directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2.mov'
 
+    loader = SeattleLoader()
+    images = loader.load_images(video_directory)
+    labels, boxes, _ = loader.load_labels(video_directory, relevant_classes=['car', 'others', 'van'])
+
+    #### example_query = 'select * from Seattle where car == 1'
+
+    ## we need to invoke the ssd method for evaluation and return the labels to all these frames
+    pp = PPLoader()
+    plabels = pp.detect(images_us)
+    pboxes = create_dummy_boxes(plabels)
+    ## we can create dummy boxes
+
+    total_time = timer.toc()
+    ## we want to report the accuracy as well
+    data_pack = evaluate_with_gt4(images, labels, boxes, images, plabels, pboxes, labelmap)
+    ### the numbers should be printed
+    data_pack['time'] = total_time
     return data_pack
+
+
 
 def jnet_sampling(total_eval_count):
     timer.tic()
@@ -122,20 +114,26 @@ def jnet_sampling(total_eval_count):
     #### example_query = 'select * from Seattle where car == 1'
 
     ## we need to invoke the ssd method for evaluation and return the labels to all these frames
-    model = SSDLoader()
-    plabels, pboxes = model.predict(rep_images)
-    total_time = timer.toc()
-    data_pack = evaluate_with_gt5(labels, plabels, mapping)
-    data_pack['time'] = total_time
+    pp = PPLoader()
+    plabels = pp.detect(images)
+    pboxes = create_dummy_boxes(plabels)
+    ## we can create dummy boxes
 
+    total_time = timer.toc()
+    ## we want to report the accuracy as well
+    data_pack = evaluate_with_gt4(images, labels, boxes, images, plabels, pboxes, labelmap)
+    ### the numbers should be printed
+    data_pack['time'] = total_time
     return data_pack
+
+
 
 
 if __name__ == "__main__":
     ## We want to save all this data so that we can output later. How about we save in a yaml format?
     data = no_sampling()
     directory = '/nethome/jbang36/eva_jaeho/eva_storage/pipeline_experiments/'
-    file = 'udfonly.yml'
+    file = 'pp.yml'
     full = os.path.join(directory, file)
     total_eval_count = 1000
 

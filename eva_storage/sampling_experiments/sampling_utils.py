@@ -1,10 +1,20 @@
 
-from others.amdegroot.eval_uad2 import *  ## we import all the functions from here and perform our own evaluation
+#from others.amdegroot.eval_uad2 import *  ## we import all the functions from here and perform our own evaluation
+import numpy as np
+import os
+from others.amdegroot.data import BaseTransform
+from others.amdegroot.data.uad import UAD_CLASSES as labelmap
 from others.amdegroot.data.uad import UAD_ROOT, UADAnnotationTransform, UADDetection
 #from others.amdegroot.data.uad import UAD_CLASSES as labelmap
 from sklearn.metrics import accuracy_score
 import sklearn.metrics as metrics ## we will use precision_score, recall_score, f1_score
+import torch
+from others.amdegroot.ssd import build_ssd
+import torch.backends.cudnn as cudnn
+from logger import Logger
+from others.amdegroot.eval_uad2 import get_voc_results_file_template, get_output_dir, detect_all_boxes, write_voc_results_file, group_annotation_by_class
 
+logger = Logger()
 
 
 
@@ -44,6 +54,7 @@ def propagate_labels(sampled_predicted_labels: dict, mapping):
 
 
 def evaluate_with_gt4(images, labels, boxes, pimages, plabels, pboxes, labelmap):
+    dataset_mean = (104, 117, 123)
     gt_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
     gt_dataset.set_images(images)
     gt_dataset.set_labels(labels)
@@ -190,6 +201,7 @@ def evaluate_with_gt2(labels, rep_labels, mapping):
 
 
 def evaluate_with_gt(images, labels, boxes, rep_images, rep_labels, rep_boxes, mapping, labelmap):
+    dataset_mean = (104, 117, 123)
     test_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
     test_dataset.set_images(rep_images)
     test_dataset.set_labels(rep_labels)
@@ -298,7 +310,7 @@ def do_python_eval_for_uniform_sampling(all_class_recs, nposes, image_count, out
     if not os.path.isdir(output_dir):
         os.mkdir(output_dir)
     for i, cls in enumerate(labelmap):
-        filename = get_voc_results_file_template(set_type, cls)
+        filename = get_voc_results_file_template('test', cls)
 
         gt_labels, predicted_labels = gather_labels_by_frame(filename, cls, all_class_recs[cls], nposes[cls],
                                                              image_count, ovthresh=0.5, use_07_metric=use_07_metric)
@@ -316,24 +328,23 @@ def do_python_eval_for_uniform_sampling(all_class_recs, nposes, image_count, out
 
 
 def evaluate_with_ssd(images, labels, boxes, rep_images, rep_labels, rep_boxes, mapping):
+    dataset_mean = (104, 117, 123)
     test_dataset = UADDetection(transform=BaseTransform(300, dataset_mean), target_transform=UADAnnotationTransform())
     test_dataset.set_images(rep_images)
     test_dataset.set_labels(rep_labels)
     test_dataset.set_boxes(rep_boxes)
 
     trained_model = '/nethome/jbang36/eva_jaeho/others/amdegroot/weights/finalists/ssd300_UAD_0408_90000.pth'
-    args.trained_model = trained_model
     num_classes = len(labelmap) + 1  # +1 for background
     net = build_ssd('test', 300, num_classes)  # initialize SSD
-    net.load_state_dict(torch.load(args.trained_model))
+    net.load_state_dict(torch.load(trained_model))
     net.eval()
-    logger.info(f"Loaded model {args.trained_model}")
+    logger.info(f"Loaded model {trained_model}")
 
-    if args.cuda:
-        net = net.cuda()
-        cudnn.benchmark = True
+    net = net.cuda()
+    cudnn.benchmark = True
 
-    output_dir = get_output_dir('ssd300_uad', set_type)
+    output_dir = get_output_dir('ssd300_uad', 'test')
     box_list = detect_all_boxes(net, test_dataset, output_dir)
 
     write_voc_results_file(box_list, test_dataset)

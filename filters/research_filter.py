@@ -28,7 +28,7 @@ Each Filter object considers 1 specific query. Either the query optimizer or the
 
 
 class FilterResearch(FilterTemplate):
-    def __init__(self, load_dir = None):
+    def __init__(self, dataset_name, predicate_name):
         """
         self.pre_models = {'pca': pca_model_instance, 'hashing': hashing_model_instance, 'sampling': sampling_model_instance}
         self.post_models = {'rf': rf_instance, 'svm':svm_instance, 'dnn':dnn_instance}
@@ -43,18 +43,29 @@ class FilterResearch(FilterTemplate):
         -> post models that do use pre processing models are saved in self.all_models
         -> in this base class, we take care of those things, so no worries!
         """
-        if not load_dir:
-            load_dir = '/nethome/jbang36/eva_jaeho/data/filter_'
-        if load_dir:
-            self.load(load_dir)
-        else:
-            rf = MLRandomForest()
-            svm = MLSVM()
-            dnn = MLMLP()
-            self.addPostModel('rf', rf)
-            self.addPostModel('svm', svm)
-            self.addPostModel('dnn', dnn)
+        FilterTemplate.__init__(self)
+        self.logger.info("Finished performing inheritance")
+        self.logger.info("QWERQWERQWERQWERQWERQWERSFDFFVVXVSAFASFS$@!#$@#$!@#$!@$#@#")
+        self.all_models = {}
 
+        self.filter_dir = '/nethome/jbang36/eva_jaeho/data/filters'
+        self.dataset_name = dataset_name
+        self.predicate_name = predicate_name
+        ###
+        return_code = self.load(self.dataset_name, self.predicate_name)
+        if return_code != 0:
+            self.logger.info("Failed to load the models... we are initializing a new set")
+            ## we could not load models for some reason -- probably directory doesn't exist
+            rf = MLRandomForest()
+            self.addPostModel('rf', rf)
+
+            # svm = MLSVM()
+            # dnn = MLMLP()
+
+            #self.addPostModel('svm', svm)
+            #self.addPostModel('dnn', dnn)
+        else:
+            self.logger.info(f"We have successfully loaded the models from {self.filter_dir}")
 
     def __repr__(self):
         today = date.today()
@@ -130,10 +141,7 @@ class FilterResearch(FilterTemplate):
             print("model name not found in post model dictionary..")
             print("  ", self.post_models.keys(), "are available")
 
-    def train(self, X: np.ndarray, y: np.ndarray, save_dir:str = None):
-        if not save_dir:
-            save_dir = '/nethome/jbang36/eva_jaeho/data/filter_models/default.txt'
-        assert(os.path.isdir(save_dir))
+    def train(self, X: np.ndarray, y: np.ndarray):
 
         for post_model_name, post_model in self.post_models.items():
             post_model.train(X, y)
@@ -148,7 +156,7 @@ class FilterResearch(FilterTemplate):
                 post_model.train(X_transform)
 
         ## after training the models, we should save them
-        self.save(save_dir)
+        self.save(self.dataset_name, self.predicate_name)
 
     def predict(self, X: np.ndarray, pre_model_name: str = None, post_model_name: str = None) -> np.ndarray:
         pre_model_names = self.pre_models.keys()

@@ -16,10 +16,13 @@ import random
 class FilterTemplate(metaclass = ABCMeta):
 
     def __init__(self):
+        self.all_models = {}
+
         self.pre_models = {}
         self.post_models = {}
-        self.all_models = {}
         self.logger = Logger()
+        self.filter_dir = '/nethome/jbang36/eva_jaeho/data/filters'
+        self.catalog_filename = 'catalog.txt'
 
 
     def __repr__(self):
@@ -65,67 +68,80 @@ class FilterTemplate(metaclass = ABCMeta):
 
 
 
-    def load(self, full_path):
+    def load(self, dataset_name, predicate_name):
         """
-        We load all the models from the txt file.
 
-        :param txt_file:
+        :param dataset_name: name of dataset
+        :param predicate_name: name of predicate
         :return:
         """
-        if not os.path.isfile(full_path):
-            self.logger.error(f"directory / file {full_path} does not exist!")
-            raise ValueError
+
+        full_path = os.path.join(self.filter_dir, dataset_name, predicate_name)
+        ## instead of raising an error, let's return an error code
+        if not os.path.isdir(full_path):
+            self.logger.error(f"directory {full_path} does not exist!")
+            return 1
+
+        catalog_path = os.path.join(full_path, self.catalog_filename)
+        if not os.path.isfile(catalog_path):
+            self.logger.error(f"catalog does not exist, {catalog_path} we cannot load from this directory")
+            return 1
 
         files = {}
         files[PRE] = []
         files[POST] = []
-        save_directory = os.path.basename(full_path)
+        self.logger.info("Inside load function...")
+        with open(catalog_path, 'r') as file:
 
-        with open(full_path, 'r') as file:
             for line in file:
-                line_parsed = line.split(',')
-                category, model_name, filename = line_parsed
-                files[category].append( (model_name, os.path.join(save_directory, filename)) )
 
-        ## now that we have files loaded, we need to actually fill in self.pre_models and self.post_models
-        for key in files.keys():
-            for model_name, full_model_path in files[key]:
-                loaded_model = joblib.load(filename)
-                if key == PRE:
-                    self.pre_models[model_name] = loaded_model
-                elif key == POST:
-                    self.post_models[model_name] = loaded_model
+                line_parsed = line.strip().split(',')
+                model_name, pre_or_post_str = line_parsed
+                model_filename = os.path.join(full_path, model_name + '.sav')
+                if pre_or_post_str == PRE:
+                    self.pre_models[model_name] = joblib.load(model_filename)
+                elif pre_or_post_str == POST:
+                    self.post_models[model_name] = joblib.load(model_filename)
 
-
-        return None
+        return 0
 
 
 
 
-    def save(self, full_path):
+    def save(self, dataset_name, predicate_name):
         """
-        :param full_path: (string) save_directory + txt_file_name
+
+        :param dataset_name: name of dataset the models were trained with
+        :param predicate_name: name of predicates the models are trained on
         :return: None
         """
         ## need to make sure the save_directory is a folder
-        ## also we need to create a txt file that saves all the models to load and where
-        ### steps: 1. we save the txt file, then we save the pre/post models
-        ### the format for saving the pre, post models are as follows:
-        ### pre, model_name, model_save_file.sav
-        ### post, model_name, model_save_file.sav
-        save_directory = os.path.basename(full_path)
-        random_num = random.randint(0, 10000)
+        ## format will be
+        """
+        filters
+         |_ dataset
+            |_ predicate
+                |_ catalog.txt
+                |_ model_name.sav
+                
+        in catalog.txt we save which models are pre/post models
+        """
 
-        with open(full_path) as txt_save_file:
+        full_dir = os.path.join(self.filter_dir, dataset_name, predicate_name)
+        os.makedirs(full_dir, exist_ok=True) ##create folders if it doesn't exist, otherwise we skip this step
+
+        catalog_file = os.path.join(full_dir, self.catalog_filename)
+        with open(catalog_file, 'w') as catalog:
             for model_name in self.pre_models:
-                model_save_full_path = os.path.join(save_directory, model_name+random_num+'.sav')
-                txt_save_file.write(f"{PRE},{model_name},{model_save_full_path}")
+                string = f"{model_name},PRE\n"
+                catalog.write(string)
+                model_save_full_path = os.path.join(full_dir, model_name+'.sav')
                 joblib.dump(self.pre_models[model_name], model_save_full_path)
-
             for model_name in self.post_models:
-                model_save_full_path = os.path.join(save_directory, model_name + random_num + '.sav')
-                txt_save_file.write(f"{POST},{model_name},{model_save_full_path}")
-                joblib.dump(self.pre_models[model_name], model_save_full_path)
+                string = f"{model_name},POST\n"
+                catalog.write(string)
+                model_save_full_path = os.path.join(full_dir, model_name+'.sav')
+                joblib.dump(self.post_models[model_name], model_save_full_path)
 
-        return
+        return 0
 

@@ -28,13 +28,13 @@ def no_sampling():
 
     loader = SeattleLoader()
     images = loader.load_images(video_directory)
-    labels, boxes, _ = loader.load_labels(video_directory, relevant_classes=['car', 'others', 'van'])
+    labels, boxes, _ = loader.load_labels(relevant_classes=['car', 'others', 'van'])
 
     #### example_query = 'select * from Seattle where car == 1'
 
     ## we need to invoke the ssd method for evaluation and return the labels to all these frames
     model = SSDLoader()
-    plabels, pboxes = model.detect(images)
+    plabels, pboxes = model.predict(images, cuda = True)
     total_time = timer.toc()
     ## we want to report the accuracy as well
     data_pack = evaluate_with_gt4(images, labels, boxes, images, plabels, pboxes, labelmap)
@@ -43,37 +43,13 @@ def no_sampling():
     return data_pack
 
 
-
-def uniform_sampling():
-    timer.tic()
-    video_directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2.mov'
-    sampling_rate = 30 ## fps
-
-    loader = SeattleLoader()
-    images = loader.load_images(video_directory)
-    labels, boxes, _ = loader.load_labels(video_directory, relevant_classes=['car', 'others', 'van'])
-
-    images_us, labels_us, boxes_us, mapping = sample3_middle(images, labels, boxes, sampling_rate=sampling_rate)
-
-    #### example_query = 'select * from Seattle where car == 1'
-
-    ## we need to invoke the ssd method for evaluation and return the labels to all these frames
-    model = SSDLoader()
-    plabels, pboxes = model.detect(images_us)
-    total_time = timer.toc()
-    data_pack = evaluate_with_gt5(labels, plabels, mapping)
-    data_pack['time'] = total_time
-
-    return data_pack
-
-
-def uniform_sampling(total_eval_count = 1000):
+def uniform_sampling(total_eval_count = 1000, cuda = True):
     timer.tic()
     video_directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2.mov'
 
     loader = SeattleLoader()
     images = loader.load_images(video_directory)
-    labels, boxes, _ = loader.load_labels(video_directory, relevant_classes=['car', 'others', 'van'])
+    labels, boxes, _ = loader.load_labels(relevant_classes=['car', 'others', 'van'])
 
     sampling_rate = len(images) // total_eval_count ## fps
 
@@ -83,7 +59,7 @@ def uniform_sampling(total_eval_count = 1000):
 
     ## we need to invoke the ssd method for evaluation and return the labels to all these frames
     model = SSDLoader()
-    plabels, pboxes = model.detect(images_us)
+    plabels, pboxes = model.predict(images_us, cuda = cuda)
     total_time = timer.toc()
     data_pack = evaluate_with_gt5(labels, plabels, mapping)
     data_pack['time'] = total_time
@@ -97,7 +73,7 @@ def jnet_sampling(total_eval_count):
 
     loader = SeattleLoader()
     images = loader.load_images(video_directory)
-    labels, boxes, _ = loader.load_labels(video_directory, relevant_classes=['car', 'others', 'van'])
+    labels, boxes, _ = loader.load_labels(relevant_classes=['car', 'others', 'van'])
 
     cluster_count = total_eval_count
     number_of_neighbors = 3
@@ -121,7 +97,7 @@ def jnet_sampling(total_eval_count):
 
     ## we need to invoke the ssd method for evaluation and return the labels to all these frames
     model = SSDLoader()
-    plabels, pboxes = model.detect(rep_images)
+    plabels, pboxes = model.predict(rep_images, cuda = True)
     total_time = timer.toc()
     data_pack = evaluate_with_gt5(labels, plabels, mapping)
     data_pack['time'] = total_time

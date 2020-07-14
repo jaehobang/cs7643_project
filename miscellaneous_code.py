@@ -61,6 +61,19 @@ def generate_video(images, save_dir, fps, frame_width, frame_height, code = 'XVI
 
     return
 
+def generate_annotation(labels, save_dir):
+    import os
+    dir_name = os.path.dirname(save_dir)
+    if os.path.isdir(dir_name):
+        with open(save_dir, "w") as save_file:
+            for i, label in enumerate(labels):
+                label_string = f"{i},{label}\n"
+                save_file.write(label_string)
+
+        print(f"Saved annotation to {save_dir}")
+    else:
+        print(f"{dir_name} does not exist, could not generate a save file")
+
 
 
 #### drawing patches

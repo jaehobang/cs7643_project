@@ -1,9 +1,8 @@
 """
 We want to create a wrapper around ssd, that can be easily used for training and evaluation
 => we could possibly define an annotation saving file as well
-
-
 """
+
 
 from logger import Logger
 import os
@@ -15,9 +14,8 @@ from others.amdegroot.data import BaseTransform
 import torch.backends.cudnn as cudnn
 from timer import Timer
 import numpy as np
-from others.amdegroot.train_uad import train_with_args
-
-
+from others.amdegroot.train_uad import foo
+#from others.amdegroot.train_uad import train_with_args
 
 
 class SSDLoader:
@@ -26,7 +24,8 @@ class SSDLoader:
         self.logger = Logger()
         if not model_dir:
             model_dir = '/nethome/jbang36/eva_jaeho/others/amdegroot/weights/finalists/ssd300_UAD_0408_90000.pth'
-        assert(os.path.isdir(model_dir))
+        self.logger.info(f"model dir is {model_dir}")
+        assert(os.path.isfile(model_dir))
         self.logger.info(f"model directory is {model_dir}")
         if not labelmap:
             labelmap = SEATTLE_CLASSES ## format is ('car', 'bus', 'others', 'van')
@@ -49,7 +48,8 @@ class SSDLoader:
 
     def train(self, images, labels, **kwargs):
         self.model.train()
-        train_with_args(self.model, images, labels, **kwargs)
+        print(f"{__file__} inside train")
+        foo(self.model, images, labels, **kwargs)
 
 
     def predict(self, images, **kwargs):
@@ -101,7 +101,7 @@ class SSDLoader:
             im, gt, h, w = dataset.pull_item(i)
             ### annotation might not be available
 
-            x = torch.Variable(im.unsqueeze(0))
+            x = im.unsqueeze(0)
             if 'cuda' in kwargs.keys() and kwargs['cuda']:
                 x = x.cuda()
             _t['im_detect'].tic()
@@ -133,3 +133,6 @@ class SSDLoader:
 
         return all_boxes
 
+
+if __name__ == "__main__":
+    print('hello world')

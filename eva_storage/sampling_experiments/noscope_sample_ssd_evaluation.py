@@ -3,14 +3,6 @@ We implement no scope functionality and evaluate on ssd
 
 """
 
-"""
-
-1. Evaluate the accuracy and speed of uniform sampling on SSD for UADetrac dataset
-
-
-
-"""
-
 from loaders.uadetrac_loader import UADetracLoader
 from loaders.jackson_loader import JacksonLoader
 from logger import Logger

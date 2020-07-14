@@ -114,6 +114,33 @@ class SeattleLoader(AbstractLoader):
         self.logger.info(f"Loaded {len(images)} in {time.perf_counter() - st} seconds")
         return images
 
+    def load_predicate_labels(self, dir):
+        """
+        This will be in numpy array format where index refers to frame_num.
+
+        :param dir:
+        :return:
+        """
+
+        dir_name = os.path.dirname(dir)
+        file_name = os.path.basename(dir)
+        assert(os.path.exists(dir)) ## dir must exist or we raise error
+        value_arr = []
+        with open(dir, 'r') as file:
+            line = file.readline().strip()
+            while line:
+                line_arr = line.split(',') ##[frame_id, value]
+                while len(value_arr) < int(line_arr[0]):
+                    value_arr.append(0) ##if not labeled, we assume the label is zero
+                value_arr.append(int(line_arr[1]))
+                line = file.readline().strip()
+        ##let's convert to numpy array
+        value_arr = np.array(value_arr)
+        return value_arr
+
+
+
+
 
     def load_labels(self, dir: str = None, relevant_classes = None):
         """
@@ -142,13 +169,13 @@ class SeattleLoader(AbstractLoader):
         confidence_threshold = 0.5
 
         txt_files = os.listdir(dir)
+        print(f"txt files that are being loaded are {txt_files}")
         count_dict = {}
-        index_dict = {}
 
         for txt_file in txt_files:
             if 'readme' in txt_file:
                 continue
-            m = re.match(r'det_(\w+).txt', txt_file)
+            m = re.match(r'det_test_(\w+).txt', txt_file)
             category = m.group(1)
             ## we there are specific classes we want, then ignore rest
             if relevant_classes is not None and category not in relevant_classes:
@@ -158,7 +185,6 @@ class SeattleLoader(AbstractLoader):
 
             if category not in count_dict.keys():
                 count_dict[category] = 0
-                index_dict[category] = np.zeros(11241, dtype = np.int) ## this is just for debugging purposes
 
             with open(full_name) as file:
                 file_content = file.read().splitlines()
@@ -176,16 +202,13 @@ class SeattleLoader(AbstractLoader):
                         labels[frame_id].append(category)
                         boxes[frame_id].append((min_x, min_y, max_x, max_y))
                         count_dict[category] += 1
-                        index_dict[category][frame_id] = 1
 
 
         ## TODO: we might need to clean empty arrays
         self.logger.info(f"label statistics info: {count_dict}")
 
-        for key in index_dict.keys():
-            index_dict[key] = index_dict[key] == 1
 
-        return labels, boxes, index_dict
+        return labels, boxes
 
 
     def convert_labels(self, labels, frame_limit_count, relevant_classes = None):

@@ -30,7 +30,7 @@ from loaders.seattle_loader import *
 
 
 ## ada-01: eva_storage -> eva_jaeho
-video_directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2_short.mp4'
+video_directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle3.mov'
 
 st = time.perf_counter()
 decompressionModule = DecompressionModule()
