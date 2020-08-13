@@ -5,6 +5,49 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torch
 import cv2
+import ffmpeg
+
+
+def ffmpeg_custom_command():
+    import subprocess
+    import json
+
+    #args = [cmd, '-show_format', '-show_streams', '-of', 'json']
+    #args += convert_kwargs_to_cmd_line_args(kwargs)
+    #args += [filename]
+    video_directory = ''
+    ##TODO: Need to modify this args list to give the command that we would like and receive the result as json so that we can modify in python
+
+    """
+    Args examples:
+    
+    >>>
+    An example of arguments that gives frame numbers based on types of frames they are.. we use 
+    args = ['ffprobe', '-select_streams', 'v', '-show_frames', '-show_entries', 'frame=pict_type', '-of', 'json', video_directory]
+    After running this command, we run
+    i_frame_list = []
+
+    for i, frame in enumerate(final_output['frames']):
+        if frame['pict_type'] == 'I':
+            i_frame_list.append(i)
+    >>>
+    >>>
+    
+
+    
+    """
+    args = ['ffprobe', '-select_streams', 'v', '-show_frames', '-show_entries', 'frame=pict_type', '-of', 'json', video_directory]
+
+
+    p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    communicate_kwargs = {}
+    out, err = p.communicate(**communicate_kwargs)
+    if p.returncode != 0:
+        print("Return code was invalid raising ValueError")
+        raise ValueError
+    final_output = json.loads(out.decode('utf-8'))
+    return final_output
+
 
 
 def draw_multiple_images_w_boxes(images, boxes):
@@ -61,11 +104,15 @@ def generate_video(images, save_dir, fps, frame_width, frame_height, code = 'XVI
 
     return
 
+
 def generate_annotation(labels, save_dir):
     import os
+
     dir_name = os.path.dirname(save_dir)
+    os.makedirs(dir_name, exist_ok = True)
     if os.path.isdir(dir_name):
         with open(save_dir, "w") as save_file:
+            print('we have opened the save directory...')
             for i, label in enumerate(labels):
                 label_string = f"{i},{label}\n"
                 save_file.write(label_string)
@@ -73,6 +120,8 @@ def generate_annotation(labels, save_dir):
         print(f"Saved annotation to {save_dir}")
     else:
         print(f"{dir_name} does not exist, could not generate a save file")
+
+
 
 
 

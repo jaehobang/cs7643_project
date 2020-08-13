@@ -27,6 +27,51 @@ class FirstEncounterMethod(SamplingMethod):
 
         return indices_list
 
+
+class IFrameConstraintMethod(SamplingMethod):
+    def __init__(self, i_frames):
+        self.i_frames = i_frames
+        self.preliminary = MiddleEncounterMethod()
+
+    def __str__(self):
+        return "I Frame Constraint Method"
+
+    def run(self, cluster_labels, X = None):
+        middle_labels = self.preliminary.run(cluster_labels)
+        ### now we have to modify these labels with i frames
+        final_labels = []
+        lower_bound = 0
+
+        did_it = False
+        for i, label in enumerate(middle_labels):
+            for j in range(lower_bound, len(self.i_frames) - 1):
+                if label >= self.i_frames[j] and label < self.i_frames[j+1]:
+                    lower_bound = j
+                    did_it = True
+                    if label - self.i_frames[j] < self.i_frames[j+1] - label:
+                        final_labels.append(self.i_frames[j])
+                    else:
+                        final_labels.append(self.i_frames[j+1])
+                elif label >= self.i_frames[j] and j+1 == len(self.i_frames) - 1:
+                    print('We have reached the end')
+                    final_labels.append(self.i_frames[j+1])
+                    did_it = True
+            if not did_it:
+                print(f"We didn't get the replacing index lower bound: {self.i_frames[lower_bound]}, {self.i_frames[lower_bound + 1]}, label: {label}")
+            did_it = False
+
+        print(self.i_frames[-10:])
+        print(middle_labels[-10:])
+        print(len(final_labels))
+        print(len(middle_labels))
+        assert(len(final_labels) == len(middle_labels))
+        return final_labels
+
+
+
+
+
+
 class MiddleEncounterMethod(SamplingMethod):
 
     def __str__(self):

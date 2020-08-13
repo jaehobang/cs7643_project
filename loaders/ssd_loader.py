@@ -63,15 +63,52 @@ class SSDLoader:
             self.model = self.model.cuda()
             cudnn.benchmark = True
         box_list = self._detect_boxes(self.model, dataset, **kwargs)
-        ## TODO:box_list is in box_list[label][frameid] format. Each element is a [xmin, ymin, xmax, ymax] format
-        ###  Need to come back to this line for _detect_boxes
-        ### shall we put it in the uad loading format??
-        box_list = self.convert2jformat(box_list)
+        ### box_list's shape is number_of_classes x number_of_frames
+        ### each element contains multiple instances of box detections;
+        ### shape is number_of_detections x [x_min, y_min, x_max, y_max, confidence]
 
-        return box_list
+
+        box_dict = self.calculate_binary_classification_by_class(box_list)
+
+        return box_dict
+
+    def calculate_binary_classification_by_class(self, box_list, threshold = 0.5):
+        """
+
+        :param box_list: output of the ssd detector
+        :param threshold: threshold to determine whether the detection is true or false
+        :return:
+        """
+        box_dict = {}
+        number_of_frames = len(box_list[0])
+        self.max_confidences = []
+        for cls_ind, cls in enumerate(self.labelmap):
+            box_dict[cls] = [] ##
+            for i in range(number_of_frames):
+                dets = box_list[cls_ind + 1][i] ## we do cls_ind + 1 because we ignore the background
+                if dets == []:
+                    box_dict[cls].append(0)
+                else:
+                    ## we want the max confidence value from among the detections
+                    max_confidence = max(dets[:, -1])
+                    if cls == 'car':
+                        self.max_confidences.append(max_confidence)
+
+                    if max_confidence > threshold:
+                        box_dict[cls].append(1)
+                    else:
+                        box_dict[cls].append(0)
+        return box_dict
+
 
     def convert2jformat(self, box_list):
         ## we convert from amdegroot to j format for boxes_detected
+        ## TODO: Grab some code from write_voc_results_file() or group_annotation_by_class()
+        ## TODO: These functions give information as to how to modify the code to get the format that we want
+        ## box_list will be in form of possible_labels x number_of_frames
+        ## each element of that will be an array of detections in the form of [xmin, ymin, xmax, ymax]
+
+        print(f"inside convert2jformat, {len(box_list)} {len(box_list[0])}")
         num_images = len(box_list[0])
         jlabels = [[] for _ in range(num_images)]
         jboxes = [[] for _ in range(num_images)]

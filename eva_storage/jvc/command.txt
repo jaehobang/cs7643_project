@@ -1,0 +1,28 @@
+
+hewlkerwer
+
+ffmpeg -skip_frame nokey -i file -vsync 0 -frame_pts true out%d.png
+
+
+
+select='eq(n\,1)+eq(n\,200)+eq(n\,400)+eq(n\,600)+eq(n\,800)+eq(n\,1000)' \
+       -vsync vfr -q:v 2
+
+
+ffmpeg -ss <start_time> -i video.mp4 -t <duration> -q:v 2 -vf select="eq(pict_type\,PICT_TYPE_I)" -vsync 0 frame%03d.jpg
+
+now let's try constructing the final command
+
+ffmpeg -i seattle2_short.mp4 -vf select="eq(pict_type\,PICT_TYPE_I)" -vsync 0 -frame_pts true iframes/out%d.png
+
+
+ffprobe -select_streams v -show_frames -show_entries frame=pict_type -of csv seattle2_short.mp4 | grep -n I | cut -d ':' -f 1 > frame_indices.txt
+
+
+
+##when returning the result, not only does it give the pict_type, it also returns the timestamp associated with the frames
+ffprobe -select_streams v -show_frames -show_entries frame=pkt_pts_time,pict_type -of json seattle2_short.mp4
+
+
+## how to force key frames from test3.mp4 and generate a new video test4.mpt
+ffmpeg -i test3.mp4 -force_key_frames 0:00:00.05,0:00:00.10 test4.mp4

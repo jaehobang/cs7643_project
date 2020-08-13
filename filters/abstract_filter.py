@@ -97,11 +97,15 @@ class FilterTemplate(metaclass = ABCMeta):
 
                 line_parsed = line.strip().split(',')
                 model_name, pre_or_post_str = line_parsed
+                self.logger.info(f"  {model_name} {pre_or_post_str}")
                 model_filename = os.path.join(full_path, model_name + '.sav')
                 if pre_or_post_str == PRE:
                     self.pre_models[model_name] = joblib.load(model_filename)
                 elif pre_or_post_str == POST:
                     self.post_models[model_name] = joblib.load(model_filename)
+
+        self.logger.info(f"pre model keys: {self.pre_models.keys()} post model keys: {self.post_models.keys()}")
+        self.logger.info(f"We have loaded from catalog path: {catalog_path}")
 
         return 0
 
@@ -133,12 +137,12 @@ class FilterTemplate(metaclass = ABCMeta):
         catalog_file = os.path.join(full_dir, self.catalog_filename)
         with open(catalog_file, 'w') as catalog:
             for model_name in self.pre_models:
-                string = f"{model_name},PRE\n"
+                string = f"{model_name},{PRE}\n"
                 catalog.write(string)
                 model_save_full_path = os.path.join(full_dir, model_name+'.sav')
                 joblib.dump(self.pre_models[model_name], model_save_full_path)
             for model_name in self.post_models:
-                string = f"{model_name},POST\n"
+                string = f"{model_name},{POST}\n"
                 catalog.write(string)
                 model_save_full_path = os.path.join(full_dir, model_name+'.sav')
                 joblib.dump(self.post_models[model_name], model_save_full_path)

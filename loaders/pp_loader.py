@@ -45,18 +45,26 @@ class PPLoader:
 
 
 
-    def predict(self, images):
+    def predict(self, images, query='car=1'):
         ## we need the function behind converting labels...?
         labels_preliminary = self.filter.predict(images)
-        images_filtered = images[labels_preliminary]
+        images_filtered = images[labels_preliminary == 1]
         ## we need the mapping
-        labels_final, boxes_final = self.udf.predict(images_filtered) ##TODO: this is not straight forward because I think the returned label is like dictionary or something
-        ### what is the output of udf.predict?? -> [labels], [boxes]
-        ## labels are in the format of [['car', 'bus', 'others'], ['car', 'car', 'others']...]
+        box_dict = self.udf.predict(images_filtered, cuda = True) ##TODO: this is not straight forward because I think the returned label is like dictionary or something
+        ## since box_dict predicts the binary classifications, we simply need to know which class we are interested and return the result
+        ## TODO: We need to figure out how the system can determine which queries are relevant
+        ## but for now, we will just manually code this
+        labels_that_we_want_from_udf = None
+        for cls_ind, cls_name in enumerate(box_dict):
+            if cls_name in query:
+                labels_that_we_want_from_udf = box_dict[cls_name]
+
+
 
         labels = np.zeros(len(images))
-        labels[labels_preliminary] = labels_final
-        labels[~labels_preliminary] = 0
+        label_ones = np.nonzero(labels_preliminary)[0]
+        labels[label_ones] = labels_that_we_want_from_udf
+        #labels[~labels_preliminary] = 0
 
         return labels
 
@@ -65,16 +73,26 @@ class PPLoader:
 
 if __name__ == "__main__":
     ### we should train the filters for future use
+    ### Train Filter Script
+
     from loaders.seattle_loader import SeattleLoader
     from loaders.uadetrac_label_converter import UADetracConverter
 
-    pp_loader = PPLoader()
+    video_directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2_train.mp4'
+
+    loader = SeattleLoader()
+    images = loader.load_images(video_directory)
+    annotation_save_dir = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2_train_annotations/contains_others.txt'
+    contains_car_label = loader.load_predicate_labels(annotation_save_dir)
+
+    pp_loader = PPLoader(dataset_name = 'seattle', predicate_name = 'others=1')
     data_loader = SeattleLoader()
     converter = UADetracConverter()
     images = data_loader.load_images() ## load the default video -- seattle2.mov, how do we deal with the model drift problem for linear SVC
 
     labels, boxes = data_loader.load_labels(relevant_classes = ['car', 'others', 'van'])
-    limit_labels = converter.convert2limit_queries2(labels, {'car': 1}, operator = 'or')
+    limit_labels = converter.convert2limit_queries2(labels, {'others': 1}, operator = 'or')
+    #limit_labels = converter.convert2limit_queries2(labels, {'car': 1}, operator = 'or')
     ## training the filters
     ## we don't need to input all the images to train the models
 

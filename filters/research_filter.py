@@ -44,8 +44,6 @@ class FilterResearch(FilterTemplate):
         -> in this base class, we take care of those things, so no worries!
         """
         FilterTemplate.__init__(self)
-        self.logger.info("Finished performing inheritance")
-        self.logger.info("QWERQWERQWERQWERQWERQWERSFDFFVVXVSAFASFS$@!#$@#$!@#$!@$#@#")
         self.all_models = {}
 
         self.filter_dir = '/nethome/jbang36/eva_jaeho/data/filters'
@@ -53,6 +51,7 @@ class FilterResearch(FilterTemplate):
         self.predicate_name = predicate_name
         ###
         return_code = self.load(self.dataset_name, self.predicate_name)
+
         if return_code != 0:
             self.logger.info("Failed to load the models... we are initializing a new set")
             ## we could not load models for some reason -- probably directory doesn't exist
@@ -158,7 +157,7 @@ class FilterResearch(FilterTemplate):
         ## after training the models, we should save them
         self.save(self.dataset_name, self.predicate_name)
 
-    def predict(self, X: np.ndarray, pre_model_name: str = None, post_model_name: str = None) -> np.ndarray:
+    def predict(self, X: np.ndarray, pre_model_name: str = None, post_model_name: str = 'rf') -> np.ndarray:
         pre_model_names = self.pre_models.keys()
         post_model_names = self.post_models.keys()
 

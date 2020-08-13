@@ -65,7 +65,7 @@ class EvaluationDataset(data.Dataset):
         return torch.from_numpy(img).permute(2, 0, 1), None, height, width
 
     def __len__(self):
-        return len(self.X_train)
+        return len(self.images)
 
 
 

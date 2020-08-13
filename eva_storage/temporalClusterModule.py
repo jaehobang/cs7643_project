@@ -23,8 +23,11 @@ class TemporalClusterModule:
         self.vector_size = vector_size
         self.logger = Logger()
 
-    def run(self, images, number_of_clusters, number_of_neighbors = 3, linkage='ward'):
+
+
+    def run(self, images, number_of_clusters, number_of_neighbors = 3, linkage='ward', compute_full_tree = False):
         """
+
         :param image_compressed:
         :param fps:
         :return: sampled frames, corresponding cluster numbers for each instance
@@ -37,15 +40,16 @@ class TemporalClusterModule:
         image_compressed = self.downsample_method.run(images, self.vector_size)
 
         connectivity = self.generate_connectivity_matrix(image_compressed, number_of_neighbors)
+        cache_dir = '/nethome/jbang36/eva_jaeho/data/clusters'
         self.ac = AgglomerativeClustering(n_clusters=number_of_clusters, connectivity=connectivity,
-                                          linkage=linkage)
+                                          linkage=linkage, memory = cache_dir, compute_full_tree = compute_full_tree)
         labels = self.ac.fit_predict(image_compressed)
         self.logger.info(f"Time to fit {n_samples}: {time.perf_counter() - start_time} (sec)")
         self.logger.info(f"Sampling frames based on {str(self.sampling_method)} strategy")
         rep_indices = self.sampling_method.run(labels, image_compressed) ## we also need to get the mapping from this information
 
-
         return image_compressed[rep_indices], rep_indices, labels
+
 
 
     def generate_connectivity_matrix(self, image_compressed, number_of_neighbors = 5):
@@ -72,6 +76,9 @@ class TemporalClusterModule:
             corresponding_cluster_number = cluster_labels[value]
             members_in_cluster_indices = cluster_labels == corresponding_cluster_number
             mapping[members_in_cluster_indices] = i
+
+        ##mapping should be integers
+        mapping = mapping.astype(np.int)
 
         return mapping
 

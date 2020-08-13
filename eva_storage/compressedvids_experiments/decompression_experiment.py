@@ -9,6 +9,8 @@ import numpy as np
 import ffmpeg
 import time
 
+
+
 def cv_decompression(directory):
     st = time.perf_counter()
     decompression_module = DecompressionModule()
@@ -16,6 +18,8 @@ def cv_decompression(directory):
 
     images_all = decompression_module.convert2images(directory, frame_count_limit=frame_count_limit)
     print(f">>>>>>>decompressed video from decompression module is {images_all.shape} total time: {time.perf_counter() - st} seconds")
+
+
 
 def ffmpeg_decompression(directory):
     st = time.perf_counter()

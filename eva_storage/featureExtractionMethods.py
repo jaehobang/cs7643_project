@@ -4,7 +4,7 @@ import numpy as np
 import skimage.measure
 import torch
 import math
-
+import cv2
 
 class FeatureExtractionMethod(ABC):
 
@@ -208,4 +208,27 @@ class DownSampleSkippingMethod(FeatureExtractionMethod):
 
         return images_reshaped
 
+
+class DownSampleSkippingCVMethod(FeatureExtractionMethod):
+
+    def __str__(self):
+        return "Downsample the image by skipping pixels"
+
+    def run(self, images, desired_vector_size):
+        assert(desired_vector_size % 10 == 0)
+        wanted_width = 10
+        wanted_height = desired_vector_size // wanted_width
+        ## we will use the cv resize method to do things
+        resized_images = []
+        for i in range(len(images)):
+            resized_images.append( cv2.resize(images[i], (wanted_width, wanted_height)) )
+        images_downscaled = np.stack(resized_images, axis = 0)
+        ## make sure stacking works as expected
+        assert(images_downscaled.shape == (len(images), 10, 10, 3))
+        images_downscaled = np.mean(images_downscaled, axis=3)
+        print(images_downscaled.shape)
+        images_reshaped = images_downscaled.reshape(len(images), wanted_width * wanted_height)
+
+
+        return images_reshaped
 

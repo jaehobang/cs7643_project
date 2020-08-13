@@ -22,7 +22,9 @@ class MLRandomForest(MLBase):
 
   def train(self, X :np.ndarray, y :np.ndarray):
     ## we should control the amount of features, the limit should be around 10000 (100,100)
+
     X = self._downsize_input(X, number_of_features=10000)
+
 
     X = self._flatten_input(X)
     y = self._check_label(y) ## make sure everything is binary labels!!
@@ -49,17 +51,24 @@ class MLRandomForest(MLBase):
 
 
   def predict(self, X :np.ndarray):
+    print(f"X before downsizing {X.shape}")
+    X = self._downsize_input(X, number_of_features=10000)
+    print(f"X after downsizing {X.shape}")
     X = self._flatten_input(X)
     return self.model.predict(X)
 
 
   def _downsize_input(self, X, number_of_features):
     import math
-    wanted_width = int(math.sqrt(number_of_features))
-    width_skip_rate = X.shape[1] // wanted_width
-    wanted_height = number_of_features // wanted_width
-    height_skip_rate = X.shape[2] // wanted_height
-    return X[:, ::height_skip_rate, ::width_skip_rate, :]
+    import cv2
+    wanted_width = int(math.sqrt(number_of_features)) ## we want 100
+    wanted_height = number_of_features // wanted_width ## we want 100
+
+    new_X = np.ndarray(shape=(X.shape[0], wanted_height, wanted_width, 3))
+    for i, image in enumerate(X):
+      new_X[i] = cv2.resize(X[i], (wanted_width, wanted_height))
+
+    return new_X
 
 
   def _flatten_input(self, X):
