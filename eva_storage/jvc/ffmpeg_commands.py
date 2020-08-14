@@ -7,10 +7,59 @@ In this file, we will write the commands we will use to communicate with ffmpeg 
 import os
 import subprocess
 import json
-
+import numpy as np
 
 
 class FfmpegCommands:
+
+    @staticmethod
+    def ffprobe(video_directory):
+        """
+        TODO: For some reason, this function is not working, but it's not important right now
+              It's something to fix later 8/13/2020
+
+        :param video_directory:
+        :return:
+        """
+        ## this function is currently not working but normal ffmpeg does work
+        arg_string = f"ffprobe -select_streams v -of json {video_directory}"
+        args = arg_string.split(' ')
+        print(f"command: {arg_string}")
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        communicate_kwargs = {}
+        out, err = p.communicate(**communicate_kwargs)
+        if p.returncode != 0:
+            print(f"Return code is {p.returncode}")
+            raise ValueError
+        print(out)
+        final_output = json.loads(out.decode('utf-8'))
+        print(final_output)
+        return final_output
+
+
+    @staticmethod
+    def write_video(images, save_directory, **kwargs):
+        framerate = 60 if not kwargs['framerate'] else kwargs['framerate']
+        length, height, width, channels = images.shape
+        arg_string = f'ffmpeg -f rawvideo -pix_fmt rgb24 -r {framerate} -s {width}x{height} -i pipe: -pix_fmt yuv420p -vcodec libx264 {save_directory} -y'
+        print(f"final commmand: {arg_string}")
+        args = arg_string.split(' ')
+        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        communicate_kwargs = {}
+
+        for frame in images:
+            p.stdin.write(
+                frame
+                    .astype(np.uint8)
+                    .tobytes()
+            )
+        out, err = p.communicate(**communicate_kwargs)
+        if p.returncode != 0:
+            print(f"Return code is {p.returncode}")
+            raise ValueError
+        print(f"Wrote video to {save_directory}... Done!")
+        return
+
 
     @staticmethod
     def force_keyframes(images, timestamps_list, save_directory, **kwargs):
@@ -26,15 +75,29 @@ class FfmpegCommands:
         :return:
         """
         framerate = 60 if not kwargs['framerate'] else kwargs['framerate']
-        length, width, height, channels = images.shape
+        length, height, width, channels = images.shape
         #### force the key frames
         timestamps_str = ",".join(timestamps_list)
+        #print(f"printing final timestamp str: {timestamps_str}")
         arg_string = f'ffmpeg -f rawvideo -pix_fmt rgb24 -r {framerate} -s {width}x{height} -i pipe: -pix_fmt yuv420p -vcodec libx264 -force_key_frames {timestamps_str} {save_directory} -y'
         args = arg_string.split(' ')
 
-        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         communicate_kwargs = {}
+
+        for frame in images:
+            p.stdin.write(
+                frame
+                    .astype(np.uint8)
+                    .tobytes()
+            )
         out, err = p.communicate(**communicate_kwargs)
+        #p.stdin.close()
+        #p.wait()
+
+        ### not only do we have to do this, we have to literally write frame by frame...
+
+
         if p.returncode != 0:
             print(f"Return code is {p.returncode}")
             raise ValueError

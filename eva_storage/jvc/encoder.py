@@ -14,12 +14,12 @@ import os
 
 
 
-class Compressor:
+class Encoder:
 
     def __init__(self):
         pass
 
-    def indices2timestamps(self, rep_indices, timestamps):
+    def indices2timestamps(self, rep_indices, frame_info):
         """
         Converts rep indices to timestamps -- we will use the frame_info to do wso
 
@@ -27,12 +27,22 @@ class Compressor:
         :param timestamps:
         :return:
         """
-        frame_info = FfmpegCommands.get_frameinfo(video_directory)  ## this gives pict type for every frame in video
         ## now we can convert from video indices to timstamps
 
+        ##TODO: convert rep_indices to timestamps_list and return it
+        ## now we need to realize that we have the frame_info and we have rep_indices -- let's try this on jupyter first
+
+        ### so now we need a helper function to convert the indices to timestamps
+        timestamps_list = []
+
+        for i, val in enumerate(rep_indices):
+            timestamps_list.append(frame_info['frames'][val]['pkt_pts_time'])
+
+        return timestamps_list
 
 
-    def run(self, images, rep_indices, save_directory):
+
+    def run(self, images, rep_indices, frame_info, save_directory):
         """
 
         :param images: images we are trying to form into the compressed format
@@ -43,10 +53,11 @@ class Compressor:
         ## once we have the images, rep_indices, and where to save the video, we can move onto creating the command to generate the new video
         ### move as pipes,
         ## we need to create the timestamps list -- conversion from rep_indices is necessary
-
-
-
+        ## we need to convert from rep_indices to timestamps list
+        timestamps_list = self.indices2timestamps(rep_indices, frame_info) ## I need access to the preprocessor
         FfmpegCommands.force_keyframes(images, timestamps_list, save_directory, framerate=60)
+
+        return ##DONE!!
 
 
 
@@ -65,29 +76,24 @@ class Compressor:
 
 if __name__ == "__main__":
     """
-    1. load the video,
-    2. generate the metadata
-    3. transform that metadata into and force key frames
+    Encoding pipeline from a regular seattle video
     """
 
     loader = SeattleLoader()
-    video_directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2_short.mp4'
+    video_directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2_15000.mp4'
     images, meta_data = loader.load_images(video_directory)
+    frame_info = FfmpegCommands.get_frameinfo(video_directory)
 
     ## preprocessing the video
     preprocessor = Preprocessor()
     video_filename = os.path.basename(video_directory)
-    ###TODO: eliminate the extension
     video_filename = video_filename.split('.')[0]
 
     rep_indices = preprocessor.run(images, video_filename)
-    rep_metadata = preprocessor.get_tree()
 
-    frame_info = FfmpegCommands.get_frameinfo(video_directory)
-
-    #### we now have rep_indices and frame_info
-    #### as a starter,
-
+    new_video_directory = os.path.join( os.path.dirname(video_directory), 'seattle2_15000_jvc.mp4' )
+    encoder = Encoder()
+    encoder.run(images, rep_indices, frame_info, new_video_directory)
 
 
 
