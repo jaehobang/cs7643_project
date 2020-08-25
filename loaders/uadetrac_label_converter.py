@@ -87,10 +87,20 @@ class UADetracConverter:
         return new_labels
 
 
+    @staticmethod
+    def replaceNoneWithZeros(labels):
+        ### we assume it is a binary label setting
+        new_labels = []
+        for label in labels:
+            if type(label) is int or type(label) is float:
+                new_labels.append(label)
+            elif label is None:
+                new_labels.append(0)
+        return new_labels
 
 
     @staticmethod
-    def convert2limit_queries(labels, car=1, bus=0, van=0, others=0):
+    def convert2limit_queries(labels, car=0, bus=0, van=0, others=0):
         ## assumption for labels is [['car', 'bus', ...'], ['car', 'bus', ...]]
         new_labels = []
         for label in labels:

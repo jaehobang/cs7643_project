@@ -28,6 +28,12 @@ class PPLoader:
         self.logger.info("Loaded udf")
         self.filter = FilterResearch(dataset_name, predicate_name)
         self.logger.info("Loaded filter")
+        self.dataset_name = dataset_name
+        self.predicate_name = predicate_name
+
+        if not self.filter.is_trained:
+            print(f">>> Note Filter is not trained!!!, Make sure to train before utilization")
+
 
     def train(self, images, labels, option):
         if option == pp_constants.ALL:

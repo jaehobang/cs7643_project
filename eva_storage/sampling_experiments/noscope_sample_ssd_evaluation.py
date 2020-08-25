@@ -73,6 +73,7 @@ def get_rep_indices_noscope(images, t_diff, delta_diff):
         else:
             mapping.append(curr_ref)
 
+    print(f"{len(mapping)}, {len(images)}")
     assert(len(mapping) == len(images))
     rep_frames_indices = np.array(rep_frames_indices)
     return rep_frames_indices, mapping
@@ -120,6 +121,7 @@ def get_final_mapping(mapping, skip_rate, original_image_count):
 #######
 
 def set_frame_count(wanted_frame_count, images, initial_t_diff, initial_delta_diff):
+    print('adsfasdfasdfasdf')
     error_bound = 0.05 ## we give in percentage, frame count needs to be within this bound
     rep_frame_indices, mapping = get_rep_indices_noscope(images, initial_t_diff, initial_delta_diff)
     curr_delta_diff = initial_delta_diff
@@ -148,7 +150,7 @@ def set_frame_count(wanted_frame_count, images, initial_t_diff, initial_delta_di
             ## break if it goes back and forth
             break
 
-
+    print(f"Final t_diff: {curr_t_diff}, Final delta_diff: {curr_delta_diff}")
 
     return rep_frame_indices, mapping
 

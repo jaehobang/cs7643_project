@@ -88,7 +88,7 @@ class MiddleEncounterMethod(SamplingMethod):
         indices_dict2 = {}
         for i, cluster_label in enumerate(cluster_labels):
             if cluster_label not in indices_dict2.keys():
-                indices_dict2[cluster_label] = 1
+                indices_dict2[cluster_label] = 0
             elif indices_dict2[cluster_label] == -1:
                 continue
             else: # not -1, already initialized

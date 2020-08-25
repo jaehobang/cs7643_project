@@ -63,8 +63,12 @@ class FilterResearch(FilterTemplate):
 
             #self.addPostModel('svm', svm)
             #self.addPostModel('dnn', dnn)
+            self.is_trained = False
         else:
             self.logger.info(f"We have successfully loaded the models from {self.filter_dir}")
+            self.is_trained = True
+
+
 
     def __repr__(self):
         today = date.today()

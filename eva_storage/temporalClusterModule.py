@@ -50,6 +50,8 @@ class TemporalClusterModule:
 
         return image_compressed[rep_indices], rep_indices, labels
 
+    def get_sampling_method(self):
+        return self.sampling_method
 
 
     def generate_connectivity_matrix(self, image_compressed, number_of_neighbors = 5):

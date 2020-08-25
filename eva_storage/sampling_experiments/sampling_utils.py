@@ -437,6 +437,16 @@ def sample3_middle(images, labels, boxes, sampling_rate = 30):
 
     print(f"{len(reference_indexes)} {len(images)}")
     assert(len(reference_indexes) == len(images))
-    return images[::sampling_rate], labels[::sampling_rate], boxes[::sampling_rate], reference_indexes
+    new_images = None
+    new_labels = None
+    new_boxes = None
+    if images is not None:
+        new_images = images[::sampling_rate]
+    if labels is not None:
+        new_labels = labels[::sampling_rate]
+    if boxes is not None:
+        new_boxes = boxes[::sampling_rate]
+
+    return new_images, new_labels, new_boxes, reference_indexes
 
 

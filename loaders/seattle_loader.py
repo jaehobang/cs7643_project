@@ -144,6 +144,7 @@ class SeattleLoader(AbstractLoader):
 
     def load_labels(self, dir: str = None, relevant_classes = None):
         """
+        Example of relevant_classes: ['car']
         Loads vehicle type, speed, color, and intersection of ua-detrac
         vehicle type, speed is given by the dataset
         color, intersection is derived from functions built-in

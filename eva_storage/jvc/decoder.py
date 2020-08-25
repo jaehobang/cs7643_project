@@ -1,5 +1,4 @@
 
-
 from loaders.seattle_loader import SeattleLoader
 from loaders.decompressionModule import DecompressionModule
 
@@ -43,8 +42,6 @@ class Decompressor:
         1. need to find a way to convert path_to_video to path_to_metadata
 
         """
-
-
 
         return
 
