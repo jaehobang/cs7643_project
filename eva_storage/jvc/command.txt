@@ -1,5 +1,4 @@
 
-hewlkerwer
 
 ffmpeg -skip_frame nokey -i file -vsync 0 -frame_pts true out%d.png
 
@@ -16,7 +15,15 @@ now let's try constructing the final command
 ffmpeg -i seattle2_short.mp4 -vf select="eq(pict_type\,PICT_TYPE_I)" -vsync 0 -frame_pts true iframes/out%d.png
 
 
+ffmpeg -i seattle2_short.mp4 -skip_frame nokey seattle2_short2.mp4
+
+
+### this command allows us to retrieve the frame ids
 ffprobe -select_streams v -show_frames -show_entries frame=pict_type -of csv seattle2_short.mp4 | grep -n I | cut -d ':' -f 1 > frame_indices.txt
+
+
+### using ffmpeg to load the video data to pipe
+ffmpeg -i {video_directory} -f rawvideo -pix_fmt rgb24 pipe:
 
 
 
@@ -26,3 +33,7 @@ ffprobe -select_streams v -show_frames -show_entries frame=pkt_pts_time,pict_typ
 
 ## how to force key frames from test3.mp4 and generate a new video test4.mpt
 ffmpeg -i test3.mp4 -force_key_frames 0:00:00.05,0:00:00.10 test4.mp4
+
+
+### command to retrieve the i-frames really quickly
+ffmpeg -discard nokey -i {video_directory} -vsync 0 -f rawvideo -pix_fmt rgb24 pipe:

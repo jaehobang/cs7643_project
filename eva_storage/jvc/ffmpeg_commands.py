@@ -39,7 +39,7 @@ class FfmpegCommands:
 
     @staticmethod
     def write_video(images, save_directory, **kwargs):
-        framerate = 60 if not kwargs['framerate'] else kwargs['framerate']
+        framerate = kwargs.get('framerate', 60) ## default value is 60 if user doesn't provide it
         length, height, width, channels = images.shape
         arg_string = f'ffmpeg -f rawvideo -pix_fmt rgb24 -r {framerate} -s {width}x{height} -i pipe: -pix_fmt yuv420p -vcodec libx264 {save_directory} -y'
         print(f"final commmand: {arg_string}")
@@ -96,8 +96,6 @@ class FfmpegCommands:
         #p.wait()
 
         ### not only do we have to do this, we have to literally write frame by frame...
-
-
         if p.returncode != 0:
             print(f"Return code is {p.returncode}")
             raise ValueError
@@ -124,3 +122,64 @@ class FfmpegCommands:
             raise ValueError
         final_output = json.loads(out.decode('utf-8'))
         return final_output
+
+
+
+    @staticmethod
+    def get_iframes(video_directory):
+        """
+        In this function, we retrieve the actual content of the i frames using the -skip_frame command
+        ## TODO: how do I actually do this? -- okay I think I can do this -- the command is below
+        ffmpeg -i {video_directory} -f rawvideo -pix_fmt rgb24 pipe:
+
+        :param video_directory: path to video
+        :return: numpy array of all i frames
+        """
+        ###first we need to know the video's height and width
+        ffprobe_command = f"ffprobe -v error -show_entries stream=width,height {video_directory}"
+        ffprobe_args = ffprobe_command.split(' ')
+        p = subprocess.Popen(ffprobe_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        communicate_kwargs = {}
+        out, err = p.communicate(**communicate_kwargs)
+        if p.returncode != 0:
+            print(f"Return code is {p.returncode}")
+            raise ValueError
+        output = out.decode('utf-8')
+        tmp = output.split('\n')
+        width = int(tmp[1].split('=')[1])
+        height = int(tmp[2].split('=')[1])
+
+        command = f"ffmpeg -discard nokey -i {video_directory} -vsync 0 -f rawvideo -pix_fmt rgb24 pipe:"
+        ## TODO: we need to modify this command to include skip_frames
+
+        args = command.split(" ")
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        communicate_kwargs = {}
+        out, err = p.communicate(**communicate_kwargs)
+        if p.returncode != 0:
+            print(f"Return code is {p.returncode}")
+            raise ValueError
+        ##### time it takes to fetch the data
+
+        video = np.frombuffer(out, np.uint8).reshape([-1, height, width, 3])
+
+        return video
+
+
+    @staticmethod
+    def get_iframe_indices(video_directory):
+        command = f"ffprobe -select_streams v -show_frames -show_entries frame=pict_type -of csv {video_directory}"
+        print(f"Command: {command}")
+        args = command.split(" ")
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        communicate_kwargs = {}
+        out, err = p.communicate(**communicate_kwargs)
+        if p.returncode != 0:
+            print(f"Return code is {p.returncode}")
+            raise ValueError
+        final_output = out.decode('utf-8') ## I assume this is a string that have the number and \n
+        ## we need to parse the final_output as a list of array
+        final_output = final_output.split('\n')
+        indices = [i for i,x in enumerate(final_output) if x == 'frame,I']
+        return np.array(indices)
+
