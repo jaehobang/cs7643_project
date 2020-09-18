@@ -19,7 +19,7 @@ class Decoder:
 
 
 
-    def run(self, video_directory, hierarchy_directory, number_of_samples = None):
+    def run(self, video_directory, hierarchy_directory, iframe_indices_directory, number_of_samples = None):
         """
         Decompress the video
         :param path_to_video: str
@@ -35,16 +35,16 @@ class Decoder:
             ##TODO: we need the path to hierarchy
 
             rep_indices = self.interpret_metadata(hierarchy_directory, number_of_samples)
-            video_iframe_indices = FfmpegCommands.get_iframe_indices(video_directory)
+            video_iframe_indices = np.load(iframe_indices_directory)
             ## now we have a the iframe indices and the rep indices....
-            video_iframes = FfmpegCommands.get_iframes(video_directory)
-            print(f"video_iframes shape is {video_iframes.shape}")
+            video_iframes = FfmpegCommands.get_iframes(video_directory) # 1.3 seconds
+            #print(f"video_iframes shape is {video_iframes.shape}")
             ## now that we have the iframes, we need to know which i frames to extract...
             ## we use rep_indices and video_iframe_indices to determine this
-            print(f"rep indices shape is {rep_indices.shape}")
-            print(f"video iframe indices shape is {video_iframe_indices.shape}")
+            #print(f"rep indices shape is {rep_indices.shape}")
+            #print(f"video iframe indices shape is {video_iframe_indices.shape}")
             projected_rep_indices = self.translate_rep_indices(rep_indices, video_iframe_indices)
-            print(f"projected_rep_indices shape is {projected_rep_indices.shape}")
+            #print(f"projected_rep_indices shape is {projected_rep_indices.shape}")
             return video_iframes[projected_rep_indices]
         else:
             ## if the number of samples is not included as argument just get decompress the whole video

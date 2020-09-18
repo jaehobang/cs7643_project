@@ -2,7 +2,7 @@
 from abc import ABC, abstractmethod
 from scipy.spatial import distance_matrix
 import numpy as np
-
+from timer import Timer
 
 class SamplingMethod(ABC):
 
@@ -68,21 +68,82 @@ class IFrameConstraintMethod(SamplingMethod):
         return final_labels
 
 
+class FastMiddleEncounterMethod(SamplingMethod):
+    """
+    Optimized over Middle Encounter Method in 2 ways:
+    1.
+    """
+    def __init__(self):
+        self.timer = Timer()
+        self.cluster_members_total_counts = {}
+
+    def __str__(self):
+        return "Fast Middle Encounter Method"
+
+    def run(self, cluster_labels, X = None):
+        #self.timer.tic()
+        max_label = int(max(cluster_labels))
+
+        for cluster_label in range(max_label + 1):
+            self.cluster_members_total_counts[cluster_label] = 0
+
+        for cluster_label in cluster_labels:
+            self.cluster_members_total_counts[cluster_label] += 1
 
 
+        ## first count how many there are
+        final_indices_list = []
+        indices_dict2 = {}
+        ### we can use while loop to skip if we already have found the middle point
 
+
+        for i, cluster_label in enumerate(cluster_labels):
+            if cluster_label not in indices_dict2.keys():
+                indices_dict2[cluster_label] = 0
+            elif indices_dict2[cluster_label] == -1:
+                continue
+            else: # not -1, already initialized
+                indices_dict2[cluster_label] += 1
+
+            if self.cluster_members_total_counts[cluster_label] // 2 == indices_dict2[cluster_label]:
+                final_indices_list.append(i)
+
+                indices_dict2[cluster_label] = -1
+        """
+        i = 0
+        while i < len(cluster_labels):
+            cluster_label = cluster_labels[i]
+            if cluster_label not in indices_dict2.keys():
+                indices_dict2[cluster_label] = 0
+            elif indices_dict2[cluster_label] == -1: ## we are done with this label
+                continue
+            else: # not -1, already initialized
+                indices_dict2[cluster_label] += 1
+
+            if self.cluster_members_total_counts[cluster_label] // 2 == indices_dict2[cluster_label]:
+                final_indices_list.append(i)
+
+                indices_dict2[cluster_label] = -1
+                i += self.cluster_members_total_counts[cluster_label] // 2 ## we can skip a lot of the frames but we should check for correctness
+            i += 1
+        """
+
+        return final_indices_list
 
 class MiddleEncounterMethod(SamplingMethod):
+
+    def __init__(self):
+        self.timer = Timer()
+        self.cluster_members_total_counts = {}
+
 
     def __str__(self):
         return "Middle Encounter Method"
 
     def run(self, cluster_labels, X = None):
-        cluster_members_total_counts = {}
         for i, cluster_label in enumerate(cluster_labels):
-            if cluster_label not in cluster_members_total_counts.keys():
-                cluster_members_total_counts[cluster_label] = sum(cluster_labels == cluster_label)
-
+            if cluster_label not in self.cluster_members_total_counts.keys():
+                self.cluster_members_total_counts[cluster_label] = sum(cluster_labels == cluster_label)
         ## first count how many there are
         final_indices_list = []
         indices_dict2 = {}
@@ -94,10 +155,11 @@ class MiddleEncounterMethod(SamplingMethod):
             else: # not -1, already initialized
                 indices_dict2[cluster_label] += 1
 
-            if cluster_members_total_counts[cluster_label] // 2 == indices_dict2[cluster_label]:
+            if self.cluster_members_total_counts[cluster_label] // 2 == indices_dict2[cluster_label]:
                 final_indices_list.append(i)
 
                 indices_dict2[cluster_label] = -1
+
 
         return final_indices_list
 

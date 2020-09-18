@@ -11,7 +11,7 @@ from loaders.seattle_loader import SeattleLoader
 from eva_storage.jvc.ffmpeg_commands import FfmpegCommands
 from eva_storage.jvc.preprocessor import Preprocessor
 import os
-
+import numpy as np
 
 
 class Encoder:
@@ -38,7 +38,7 @@ class Encoder:
 
 
 
-    def run(self, images, rep_indices, load_directory, save_directory):
+    def run(self, images, rep_indices, load_directory, video_save_directory, iframe_save_directory):
         """
 
         :param images: images we are trying to form into the compressed format
@@ -50,24 +50,30 @@ class Encoder:
         ### move as pipes,
         ## we need to create the timestamps list -- conversion from rep_indices is necessary
         ## we need to convert from rep_indices to timestamps list
+        print(f"saving newly encoded video to: {video_save_directory}")
+        print(f"saving i frame information video to: {iframe_save_directory}")
         frame_info = FfmpegCommands.get_frameinfo(load_directory)
         timestamps_list = self.indices2timestamps(rep_indices, frame_info) ## I need access to the preprocessor
-        FfmpegCommands.force_keyframes(images, timestamps_list, save_directory, framerate=60)
+        FfmpegCommands.force_keyframes(images, timestamps_list, video_save_directory, framerate=60)
+
+        self.save_iframe_indices(video_save_directory, iframe_save_directory)
+
+
 
         return ##DONE!!
 
+    def save_iframe_indices(self, video_directory, save_directory):
+        iframe_indices = FfmpegCommands.get_iframe_indices(video_directory)
+        if type(iframe_indices) == list:
+            iframe_indices = np.array(iframe_indices)
+
+        dirname = os.path.dirname(save_directory)
+        os.makedirs(dirname, exist_ok=True)
+        np.save(save_directory, iframe_indices)
 
 
 
-    def get_iframes(self, frameinfo):
 
-        i_frame_list = []
-
-        for i, frame in enumerate(frameinfo['frames']):
-            if frame['pict_type'] == 'I':
-                i_frame_list.append(i)
-
-        return i_frame_list
 
 
 

@@ -7,16 +7,38 @@ Interface should be run(images)
 
 import numpy as np
 import os
+import time
+
 
 from eva_storage.temporalClusterModule import TemporalClusterModule
 from eva_storage.featureExtractionMethods import DownSampleMeanMethod
-from eva_storage.samplingMethods import MiddleEncounterMethod
+from eva_storage.samplingMethods import FastMiddleEncounterMethod, MiddleEncounterMethod
+
+
+class Timer:
+
+    def __init__(self):
+        self.st = -1
+        self.nt = -1
+
+
+    def tic(self):
+        self.st = time.perf_counter()
+
+    def toc(self, **kwargs):
+        self.nt = time.perf_counter()
+        self.print(**kwargs)
+
+    def print(self, **kwargs):
+        print(f"time taken is {self.nt - self.st} (seconds)")
+        if kwargs:
+            print(f"   {kwargs}")
 
 
 class Preprocessor:
     def __init__(self):
         self.cluster = TemporalClusterModule(downsample_method=DownSampleMeanMethod(),
-                                             sampling_method=MiddleEncounterMethod())
+                                             sampling_method=FastMiddleEncounterMethod())
         self.children = None
 
 
@@ -24,7 +46,7 @@ class Preprocessor:
         return self.children
 
 
-    def run(self, images, hierarchy_save_dir, cluster_count = None):
+    def run(self, images, cluster_count = None):
 
         ### we need to compute the full tree and save the model
         number_of_neighbors = 3
@@ -34,15 +56,14 @@ class Preprocessor:
             cluster_count = len(images) // 100
         if cluster_count <= 0:
             cluster_count = len(images)
+        print(f"Running clustering method with {cluster_count} clusters")
         _, rep_indices, all_cluster_labels = self.cluster.run(images, number_of_clusters=cluster_count,
                                                                   number_of_neighbors=number_of_neighbors,
                                                                   linkage=linkage, compute_full_tree = True)
         ## the algorithm automatically computes the full tree
-
+        assert(cluster_count == len(rep_indices))
         children = self.cluster.ac.children_
         assert(len(children) == len(images) - 1)
-
-        os.makedirs(hierarchy_save_dir, exist_ok=True)
 
         self.children = children
 
@@ -50,8 +71,43 @@ class Preprocessor:
         return rep_indices
 
 
+    def run_debug(self, images, **kwargs):
+        """
+        ## TODO: let's do a bit of debugging to see exactly where things are hanging...
+        This function incorporates the clustering with hierarchy generation
+        UPDATE: 8/31 -- we will modify the clustering algorithm to stop at len(images) // 100
+                     -- if we move beyond this point, we just need to decode the entire video
+        :param images:
+        :param video_filename:
+        :param cluster_count:
+        :return:
+        """
+
+        ### we need to compute the full tree and save the model
+        number_of_neighbors = 3
+        linkage = 'ward'
+
+        cluster_count = kwargs.get('cluster_count', 100)
+        stopping_point = kwargs.get('stopping_point', len(images) // 100)
+
+        _, rep_indices, all_cluster_labels = self.cluster.run(images, number_of_clusters=cluster_count,
+                                                              number_of_neighbors=number_of_neighbors,
+                                                              linkage=linkage, compute_full_tree=True)
+        ## the algorithm automatically computes the full tree
+
+        children = self.cluster.ac.children_
+        self.children = children
+
+
+        ## note this only has the first part of generating the hierachy!
+        return
+
+
+
     def run_final(self, images, hierarchy_save_dir, **kwargs):
         """
+
+        ## TODO: let's do a bit of debugging to see exactly where things are hanging...
         This function incorporates the clustering with hierarchy generation
         UPDATE: 8/31 -- we will modify the clustering algorithm to stop at len(images) // 100
                      -- if we move beyond this point, we just need to decode the entire video
@@ -105,25 +161,38 @@ class Preprocessor:
 
         assert(type(stopping_point) == int)
 
-        for i in range(image_count):
+        print(f"Inside get_hierarchy(), going into loop to measure each timing")
+        #timer = Timer()
+        i = 0
+        while i < stopping_point:
             ## we are performing a bottom-up approach
             #print(f"cluster_labels: {current_labels}")
+            #timer.tic()
             rep_indices_list = sampling_method.run(current_labels)   ###TODO we need to input the labels that are output of the clustering algorithm)
+            #timer.toc(sampling_method = 'done')
             ## make sure to eliminate the ones that are already in the hierarchy list -- how do we know this?
             ## we have to remember the frame_id and cluster label that we have already chosen the representative frame
             #print(f"rep_indices_list: {rep_indices_list}")
+            #timer.tic()
             ignore_cluster_list = self.get_ignore_cluster_labels(hierarchy_list, current_labels)
+            #timer.toc(ignore_cluster_labels='done')
             #print(f"ignore_cluster_list: {ignore_cluster_list}")
+            #timer.tic()
             final_rep_indices_list = self.get_final_rep_frames(rep_indices_list, ignore_cluster_list, current_labels)
+            #timer.toc(get_final_rep_frames='done')
             #print(f"final_rep_indices_list: {final_rep_indices_list}")
+            #timer.tic()
             hierarchy_list.extend(final_rep_indices_list)
+            #timer.toc(extend_hierarchy_list='done')
             #print(f"hierarchy_list: {hierarchy_list}")
+            #timer.tic()
             current_labels = self.update_current_labels(current_labels, i) ### TODO: we do this by using self.children?
+            #timer.toc(update_current_labels='done')
             #print(f"\n\n")
             #print(f"count of new label({max(current_labels)})= {sum(current_labels == max(current_labels))}")
 
-            if i == stopping_point:
-                break
+            if i == len(hierarchy_list) - 1:
+                i += 1
 
         hierarchy_list = np.array(hierarchy_list)
         self.hierarchy = hierarchy_list
@@ -134,44 +203,79 @@ class Preprocessor:
         return hierarchy_list
 
 
-    def get_hierarchy_debug(self, number_of_samples):
+    def get_hierarchy_debug(self, stopping_point):
         """
-        This function is very similar to the get_hirarchy() except since we specify the number of samples,
+        This function is very similar to the get_hierarchy() except since we specify the number of samples,
         we can derive the mapping behind the frames that have been chosen
-
 
         1. Let's think. The children that we refer to, it tells the order of how we go about clustering things
         Hence, if we had 1 cluster (all the points were grouped together) we would use the middle encounter method to summarize
         Hence, it would be
             1. perform clustering using the groupings outlined in self.children ie, get the labels for all the clusters
             2. use the middle encounter method to pick the representative frames
-
         :return:
         """
+
         hierarchy_list = [] ## as we move on, we add each element to this list
         image_count = self.children.shape[0] + 1
         sampling_method = self.cluster.get_sampling_method()
-        current_labels = np.zeros(image_count)
-        for i in range(number_of_samples):
-            ## we are performing a bottom-up approach
+        current_labels = np.zeros(image_count, dtype = np.int)
+        i = 0
+        while len(hierarchy_list) < stopping_point:
             #print(f"cluster_labels: {current_labels}")
-            rep_indices_list = sampling_method.run(current_labels)   ###TODO we need to input the labels that are output of the clustering algorithm)
-            ## make sure to eliminate the ones that are already in the hierarchy list -- how do we know this?
+            """
+            Things we can check:
+            1. Current labels needs to have at least 1 number of everything
+            2. rep_indices should return as many the existing number of labels out there
+                - if 0 to 65 then 66 rep indices should be in the array
+            """
+
+            ##### DEBUGGING CODE #####
+            """
+            debug_array = np.zeros(max(current_labels) + 1)
+            for label in current_labels:
+                debug_array[label] = 1
+            for ii in range(len(debug_array)):
+                if debug_array[ii] != 1:
+                    print(f"{i} MISSING {ii}!!!! Something is wrong!!!!")
+                    break
+            """
+            ##### END OF DEBUGGING CODE #####
+
+            rep_indices_list = sampling_method.run(current_labels) # TODO: gives rep indices on all the current labels
+            ##
             ## we have to remember the frame_id and cluster label that we have already chosen the representative frame
-            #print(f"rep_indices_list: {rep_indices_list}")
+            print(f"max, min of current labels: {max(current_labels)}, {min(current_labels)}")
+            ######
+            if len(rep_indices_list) != max(current_labels) + 1:
+                print(f"{i}Sampling Method ERROR: number of rep frames does not match the number of clusters in array")
+                ### we will save all the information here
+                save_dir = os.path.join('/nethome/jbang36/eva_jaeho/eva_storage/jvc_experiments/debug_arrays', 'tmp.npy')
+                np.save(save_dir, current_labels)
+
+                break
+
+
+            print(f"rep_indices_list: {len(rep_indices_list)}")
             ignore_cluster_list = self.get_ignore_cluster_labels(hierarchy_list, current_labels)
-            #print(f"ignore_cluster_list: {ignore_cluster_list}")
+            print(f"ignore_cluster_list: {len(ignore_cluster_list)}")
             final_rep_indices_list = self.get_final_rep_frames(rep_indices_list, ignore_cluster_list, current_labels)
-            #print(f"final_rep_indices_list: {final_rep_indices_list}")
+            print(f"final_rep_indices_list: {len(final_rep_indices_list)}")
             hierarchy_list.extend(final_rep_indices_list)
-            #print(f"hierarchy_list: {hierarchy_list}")
-            current_labels = self.update_current_labels(current_labels, i) ### TODO: we do this by using self.children?
-            #print(f"\n\n")
+            print(f"hierarchy_list: {len(hierarchy_list)}")
+            if len(hierarchy_list) != stopping_point: ### we shouldn't do this at the end
+                current_labels = self.update_current_labels(current_labels, i)
+            print(f"\n\n")
             #print(f"count of new label({max(current_labels)})= {sum(current_labels == max(current_labels))}")
+            #print(f"i = {i}, len(hierarchy_list) = {len(hierarchy_list)}")
+            ## okay, if we have filtered out more than 1, what will happen?
+            print(f"{i} len of final_rep_indices_list: {len(final_rep_indices_list)}, len(hierarchy_list): {len(hierarchy_list)}")
+
+            i += 1
 
         hierarchy_list = np.array(hierarchy_list)
 
-        return hierarchy_list, current_labels ##TODO: is current_labels same as mapping? -- i don't think so
+        return hierarchy_list, current_labels
 
 
     def update_labels_recursive(self, current_labels, new_label, child):

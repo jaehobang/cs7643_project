@@ -12,6 +12,38 @@ import numpy as np
 
 class FfmpegCommands:
 
+
+    @staticmethod
+    def load_video(video_directory):
+        ffprobe_command = f"ffprobe -v error -show_entries stream=width,height {video_directory}"
+        ffprobe_args = ffprobe_command.split(' ')
+        p = subprocess.Popen(ffprobe_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        communicate_kwargs = {}
+        out, err = p.communicate(**communicate_kwargs)
+        if p.returncode != 0:
+            print(f"Return code is {p.returncode}")
+            raise ValueError
+        output = out.decode('utf-8')
+        tmp = output.split('\n')
+        width = int(tmp[1].split('=')[1])
+        height = int(tmp[2].split('=')[1])
+
+
+        command = f"ffmpeg -i {video_directory} -vsync 0 -f rawvideo -pix_fmt rgb24 pipe:"
+        args = command.split(" ")
+        p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        communicate_kwargs = {}
+        out, err = p.communicate(**communicate_kwargs)
+        if p.returncode != 0:
+            print(f"Return code is {p.returncode}")
+            raise ValueError
+        ##### time it takes to fetch the data
+
+        video = np.frombuffer(out, np.uint8).reshape([-1, height, width, 3])
+
+        return video
+
+
     @staticmethod
     def ffprobe(video_directory):
         """
@@ -166,6 +198,7 @@ class FfmpegCommands:
         return video
 
 
+
     @staticmethod
     def get_iframe_indices(video_directory):
         command = f"ffprobe -select_streams v -show_frames -show_entries frame=pict_type -of csv {video_directory}"
@@ -182,4 +215,5 @@ class FfmpegCommands:
         final_output = final_output.split('\n')
         indices = [i for i,x in enumerate(final_output) if x == 'frame,I']
         return np.array(indices)
+
 
