@@ -1,9 +1,10 @@
 """
-In this file, we perform accuracy experiments with benchmarks
-same content as paper_experiments.ipynb
+In this file, we preform experiments on how vector size affects accuracy
 
-TODO: caching model results....
-
+Things we want to experiment:
+1. does increasing the vector size decrease recall?
+2. how much difference in terms of training time?
+3.
 
 """
 
@@ -39,7 +40,7 @@ class Writer:
 
     @staticmethod
     def write(method_name, dataset_name, benchmark_results):
-        write_directory = os.path.join('/nethome/jbang36/eva_jaeho/data/benchmark_results/accuracy', dataset_name, method_name+'.txt')
+        write_directory = os.path.join('/nethome/jbang36/eva_jaeho/data/benchmark_results/vector_size', dataset_name, method_name+'.txt')
         base = os.path.dirname(write_directory)
         os.makedirs(base, exist_ok=True)
         file_descriptor = open(write_directory, 'a+')
@@ -48,7 +49,7 @@ class Writer:
         date_time = now.strftime("%m/%d/%Y, %H:%M:%S")
 
 
-        file_descriptor.write(f"Timestamp: {date_time}")
+        file_descriptor.write(f"Timestamp: {date_time}\n")
         for label, value in benchmark_results.items():
             f1_score, precision, recall = value
             file_descriptor.write(f"{label}: F1 - {f1_score}, P - {precision}, R - {recall}\n")
@@ -105,14 +106,15 @@ def load_seattle2_short():
     cutoff = 100000
     seattle_gt_labels = {}
     seattle_gt_labels['car'] = UADetracConverter.convert2limit_queries(seattle_labels, car=1)
-    seattle_gt_labels['others'] = UADetracConverter.convert2limit_queries(seattle_labels, others=1)
-    seattle_gt_labels['van'] = UADetracConverter.convert2limit_queries(seattle_labels, bus=1)
+    # seattle_gt_labels['others'] = UADetracConverter.convert2limit_queries(seattle_labels, others=1)
+    # seattle_gt_labels['van'] = UADetracConverter.convert2limit_queries(seattle_labels, bus=1)
     for label in seattle_gt_labels.keys():
         seattle_gt_labels[label] = UADetracConverter.replaceNoneWithZeros(seattle_gt_labels[label])[:cutoff]
     seattle_boxes = seattle_boxes[:cutoff]
 
     assert(len(seattle_images) == cutoff)
     assert(len(seattle_boxes) == cutoff)
+    assert(len(seattle_gt_labels['car']) == cutoff)
     return ('seattle2', seattle_images, seattle_gt_labels, seattle_boxes)
 
 
@@ -121,48 +123,13 @@ def load_seattle2_short():
 #######################################
 
 
-def perform_benchmark_udf(gt_labels, ssd_predictions, dataset_name, query_name):
-    benchmark_results = {}
-    #for label, predicted_labels in ssd_predictions.items():
-    predicted_labels = ssd_predictions
-    print(gt_labels[:100])
-    print('-------------')
-    print(predicted_labels[:100])
-
-    f1_score = metrics.f1_score(gt_labels, predicted_labels)
-    precision_score = metrics.precision_score(gt_labels, predicted_labels)
-    recall_score = metrics.recall_score(gt_labels, predicted_labels)
-    benchmark_results[query_name] = ( f1_score, precision_score, recall_score )
-
-    Writer.write('udf', dataset_name, benchmark_results)
-    return benchmark_results
-
-
-def perform_benchmark_pp(gt_labels, pp_predictions, dataset_name, query_name):
-    benchmark_results = {}
-    predicted_labels = pp_predictions
-    f1_score = metrics.f1_score(gt_labels, predicted_labels)
-    precision_score = metrics.precision_score(gt_labels, predicted_labels)
-    recall_score = metrics.recall_score(gt_labels, predicted_labels)
-    benchmark_results[query_name] = (f1_score, precision_score, recall_score)
-
-    Writer.write('pp', dataset_name, benchmark_results)
-    return benchmark_results
-
-
-def perform_benchmark_us_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, label_name):
+def perform_benchmark_us_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples):
     skip_rate = len(images) // number_of_samples
     sampled_images, _, _, mapping = sample3_middle(images, None, None, sampling_rate = skip_rate)
 
     sampled_pp_predictions = pp_predictions[::skip_rate]
 
     benchmark_results = {}
-
-    if sum(sampled_pp_predictions) == 0:
-        print("NONE DETECTED THROUGH US!!!!!!! exiting....")
-        return None
-
-    print(f"total number of detections is {sum(sampled_pp_predictions)}")
 
     data_pack = evaluate_with_gt5(gt_labels, sampled_pp_predictions, mapping)
     ### data_pack has keys ( accuracy, precision, recall, f1_score
@@ -171,11 +138,11 @@ def perform_benchmark_us_pp(images, gt_labels, pp_predictions, dataset_name, que
     recall_score = data_pack['recall']
     benchmark_results[query_name] = (f1_score, precision_score, recall_score)
 
-    Writer.write(f'us_pp_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
+    Writer.write(f'us_pp_{number_of_samples}', dataset_name, benchmark_results)
     return benchmark_results
 
 
-def perform_benchmark_noscope_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, label_name):
+def perform_benchmark_noscope_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples):
     t_diff = 1
     delta_diff = 100
     noscope_rep_indices, mapping = set_frame_count(number_of_samples, images, t_diff, delta_diff)
@@ -189,16 +156,15 @@ def perform_benchmark_noscope_pp(images, gt_labels, pp_predictions, dataset_name
     recall_score = data_pack['recall']
     benchmark_results[query_name] = (f1_score, precision_score, recall_score)
 
-    Writer.write(f'noscope_pp_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
+    Writer.write(f'noscope_pp_{number_of_samples}', dataset_name, benchmark_results)
 
 
 
-def perform_benchmark_jvc_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, label_name):
-    preprocessor = Preprocessor()
+def perform_benchmark_jvc_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, vector_size = 100):
+    preprocessor = Preprocessor(vector_size = vector_size)
     ### we need to supply the number of samples here.....
     jvc_indices = preprocessor.run(images, cluster_count = number_of_samples)
     jvc_mapping = preprocessor.get_mapping()
-
     jvc_sample_labels = pp_predictions[jvc_indices]
 
     benchmark_results = {}
@@ -209,11 +175,11 @@ def perform_benchmark_jvc_pp(images, gt_labels, pp_predictions, dataset_name, qu
     recall_score = data_pack['recall']
     benchmark_results[query_name] = (f1_score, precision_score, recall_score)
 
-    Writer.write(f'jvc_pp_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
+    Writer.write(f'jvc_pp_{number_of_samples}_{vector_size}', dataset_name, benchmark_results)
 
 
-def perform_benchmark_hierarchy_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, label_name):
-    preprocessor = Preprocessor()
+def perform_benchmark_hierarchy_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, vector_size = 100):
+    preprocessor = Preprocessor(vector_size = vector_size)
     preprocessor.run_debug(images, stopping_point = number_of_samples)
     jvc_hierarchy, jvc_mapping = preprocessor.get_hierarchy_debug(stopping_point = number_of_samples)
     assert(len(jvc_hierarchy) == number_of_samples)
@@ -229,7 +195,8 @@ def perform_benchmark_hierarchy_pp(images, gt_labels, pp_predictions, dataset_na
     recall_score = data_pack['recall']
     benchmark_results[query_name] = (f1_score, precision_score, recall_score)
 
-    Writer.write(f'hierarchy_pp_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
+    Writer.write(f'hierarchy_pp_{number_of_samples}_{vector_size}', dataset_name, benchmark_results)
+
 
 
 def perform_benchmarks(dataset, ssd_predictions, pp_predictions, label_name, query_name, number_of_samples):
@@ -248,10 +215,16 @@ def perform_benchmarks(dataset, ssd_predictions, pp_predictions, label_name, que
     ## benchmark_functions
     #perform_benchmark_udf(labels[label_name], ssd_predictions, name, query_name)
     #perform_benchmark_pp(labels[label_name], pp_predictions, name, query_name)
-    perform_benchmark_us_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples, label_name)
-    perform_benchmark_noscope_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples, label_name)
-    perform_benchmark_jvc_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples, label_name)
-    perform_benchmark_hierarchy_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples, label_name)
+    #perform_benchmark_us_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples)
+    #perform_benchmark_noscope_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples)
+
+    ### Newly added: 9/25 to experiment with vector sizes
+
+    vector_sizes = [100,400,900,1600,2500,3600]
+    for size in vector_sizes:
+        #perform_benchmark_hierarchy_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples, vector_size = size)
+        perform_benchmark_jvc_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples, vector_size = size)
+
 
 
 
@@ -260,9 +233,6 @@ def perform_benchmarks(dataset, ssd_predictions, pp_predictions, label_name, que
 
 
 if __name__ == "__main__":
-
-    ### we want to try a very rare event related query
-    ## The filter model for van=1 is not correctly trained (returns all zeros), we have to redo training
 
     ### we will run it from tmux
     print(f"Running file {__file__}...")

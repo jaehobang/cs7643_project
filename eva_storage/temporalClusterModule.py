@@ -1,9 +1,8 @@
-
 from __future__ import annotations
 import time
 from sklearn.cluster import AgglomerativeClustering
 from logger import Logger
-from eva_storage.samplingMethods import MiddleEncounterMethod
+from eva_storage.samplingMethods import MiddleEncounterMethod, FastMiddleEncounterMethod
 from eva_storage.featureExtractionMethods import DownSampleMeanMethod, DownSampleSkippingMethod
 import numpy as np
 
@@ -15,7 +14,7 @@ import numpy as np
 
 class TemporalClusterModule:
 
-    def __init__(self, downsample_method= DownSampleSkippingMethod(), sampling_method=MiddleEncounterMethod(),
+    def __init__(self, downsample_method= DownSampleSkippingMethod(), sampling_method=FastMiddleEncounterMethod(),
                         vector_size = 100):
         self.ac = None
         self.sampling_method = sampling_method
@@ -60,8 +59,8 @@ class TemporalClusterModule:
         from sklearn.neighbors import kneighbors_graph
         A = kneighbors_graph(index_list_np, number_of_neighbors , mode='connectivity', include_self=True)
 
-        return A.toarray()
-
+        #return A.toarray()
+        return A
 
 
     def get_mapping(self, rep_indices, cluster_labels):

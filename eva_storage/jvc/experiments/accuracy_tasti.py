@@ -1,8 +1,9 @@
 """
-In this file, we perform accuracy experiments with benchmarks
-same content as paper_experiments.ipynb
+In this file, we compare
+EKO pipeline (mean downsampling)
+vgg16 EKO pipeline (vgg16)
+tasti (vgg16 + fpf + nearest neighbors label prop)
 
-TODO: caching model results....
 
 
 """
@@ -28,6 +29,8 @@ from eva_storage.sampling_experiments.sampling_utils import sample3_middle
 from eva_storage.sampling_experiments.sampling_utils import evaluate_with_gt5
 from eva_storage.sampling_experiments.noscope_sample_ssd_evaluation import set_frame_count, get_rep_indices_noscope
 from eva_storage.jvc.preprocessor import Preprocessor
+from eva_storage.featureExtractionMethods import VGG16Method
+from eva_storage.baselines.tasti.tasti_base import *
 
 import sklearn.metrics as metrics
 
@@ -35,11 +38,12 @@ import sklearn.metrics as metrics
 datasets = []
 benchmarks = []
 
+
 class Writer:
 
     @staticmethod
     def write(method_name, dataset_name, benchmark_results):
-        write_directory = os.path.join('/nethome/jbang36/eva_jaeho/data/benchmark_results/accuracy', dataset_name, method_name+'.txt')
+        write_directory = os.path.join('/nethome/jbang36/eva_jaeho/data/benchmark_results/accuracy_tasti', dataset_name, method_name+'.txt')
         base = os.path.dirname(write_directory)
         os.makedirs(base, exist_ok=True)
         file_descriptor = open(write_directory, 'a+')
@@ -76,23 +80,6 @@ def load_uadetrac():
     for label in gt_labels.keys():
         gt_labels[label] = UADetracConverter.replaceNoneWithZeros(gt_labels[label])
     return ('ua_detrac', uad_images, gt_labels, ua_boxes)
-
-
-def load_seattle2():
-    seattle_loader = SeattleLoader()
-    directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2.mp4'
-    seattle_images = seattle_loader.load_images(directory)
-    label_directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2_annotations'
-    seattle_labels, seattle_boxes = seattle_loader.load_labels(label_directory,
-                                                               relevant_classes=['car', 'van', 'others'])
-    seattle_gt_labels = {}
-    seattle_gt_labels['car'] = UADetracConverter.convert2limit_queries(seattle_labels, car=1)
-    #seattle_gt_labels['others'] = UADetracConverter.convert2limit_queries(seattle_labels, others=1)
-    #seattle_gt_labels['van'] = UADetracConverter.convert2limit_queries(seattle_labels, bus=1)
-    for label in seattle_gt_labels.keys():
-        seattle_gt_labels[label] = UADetracConverter.replaceNoneWithZeros(seattle_gt_labels[label])
-
-    return ('seattle2', seattle_images, seattle_gt_labels, seattle_boxes)
 
 
 def load_seattle2_short():
@@ -138,59 +125,94 @@ def perform_benchmark_udf(gt_labels, ssd_predictions, dataset_name, query_name):
     return benchmark_results
 
 
-def perform_benchmark_pp(gt_labels, pp_predictions, dataset_name, query_name):
-    benchmark_results = {}
-    predicted_labels = pp_predictions
-    f1_score = metrics.f1_score(gt_labels, predicted_labels)
-    precision_score = metrics.precision_score(gt_labels, predicted_labels)
-    recall_score = metrics.recall_score(gt_labels, predicted_labels)
-    benchmark_results[query_name] = (f1_score, precision_score, recall_score)
-
-    Writer.write('pp', dataset_name, benchmark_results)
-    return benchmark_results
-
-
-def perform_benchmark_us_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, label_name):
-    skip_rate = len(images) // number_of_samples
-    sampled_images, _, _, mapping = sample3_middle(images, None, None, sampling_rate = skip_rate)
-
-    sampled_pp_predictions = pp_predictions[::skip_rate]
+def perform_benchmark_tasti_udf(images, gt_labels, ssd_predictions, dataset_name, query_name, number_of_samples, label_name):
+    tasti = Tasti()
+    tasti_indices, tasti_labels, tasti_mapping = tasti.run(images)
+    tasti_sample_labels = ssd_predictions[tasti_indices]
 
     benchmark_results = {}
-
-    if sum(sampled_pp_predictions) == 0:
-        print("NONE DETECTED THROUGH US!!!!!!! exiting....")
-        return None
-
-    print(f"total number of detections is {sum(sampled_pp_predictions)}")
-
-    data_pack = evaluate_with_gt5(gt_labels, sampled_pp_predictions, mapping)
-    ### data_pack has keys ( accuracy, precision, recall, f1_score
+    data_pack = evaluate_with_gt5(gt_labels[label_name], tasti_sample_labels, tasti_mapping)
     f1_score = data_pack['f1_score']
     precision_score = data_pack['precision']
     recall_score = data_pack['recall']
     benchmark_results[query_name] = (f1_score, precision_score, recall_score)
 
-    Writer.write(f'us_pp_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
-    return benchmark_results
+    Writer.write(f'tasti_udf_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
 
-
-def perform_benchmark_noscope_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, label_name):
-    t_diff = 1
-    delta_diff = 100
-    noscope_rep_indices, mapping = set_frame_count(number_of_samples, images, t_diff, delta_diff)
-    noscope_sample_labels = pp_predictions[noscope_rep_indices]
+def perform_benchmark_eko_udf(images, gt_labels, ssd_predictions, dataset_name, query_name, number_of_samples, label_name):
+    preprocessor = Preprocessor()
+    eko_indices = preprocessor.run(images, cluster_count = number_of_samples)
+    eko_indices = np.array(eko_indices).astype(np.int)
+    eko_mapping = preprocessor.get_mapping()
+    eko_sample_labels = ssd_predictions[eko_indices]
+    gt_label = gt_labels[label_name]
 
     benchmark_results = {}
 
-    data_pack = evaluate_with_gt5(gt_labels, noscope_sample_labels, mapping)
+
+    data_pack = evaluate_with_gt5(gt_label, eko_sample_labels, eko_mapping)
     f1_score = data_pack['f1_score']
     precision_score = data_pack['precision']
     recall_score = data_pack['recall']
     benchmark_results[query_name] = (f1_score, precision_score, recall_score)
 
-    Writer.write(f'noscope_pp_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
+    Writer.write(f'eko_udf_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
 
+
+def perform_benchmark_vgg16_eko_udf(images, gt_labels, ssd_predictions, dataset_name, query_name, number_of_samples, label_name):
+    preprocessor = Preprocessor(downsample_method = VGG16Method())
+    eko_indices = preprocessor.run(images, cluster_count=number_of_samples)
+
+    eko_indices = np.array(eko_indices).astype(np.int)
+    eko_mapping = preprocessor.get_mapping()
+    eko_sample_labels = ssd_predictions[eko_indices]
+    gt_label = gt_labels[label_name]
+
+    benchmark_results = {}
+    data_pack = evaluate_with_gt5(gt_label, eko_sample_labels, eko_mapping)
+    f1_score = data_pack['f1_score']
+    precision_score = data_pack['precision']
+    recall_score = data_pack['recall']
+    benchmark_results[query_name] = (f1_score, precision_score, recall_score)
+
+    Writer.write(f'eko_udf_vgg16_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
+
+
+def perform_benchmark_eko_best_udf(images, gt_labels, ssd_predictions, dataset_name, query_name, number_of_samples, label_name):
+    from eva_storage.eko.best import EKOBest
+
+    method = EKOBest()
+    eko_indices, eko_mapping = method.run(images)
+    eko_indices = np.array(eko_indices).astype(np.int)
+    eko_sample_labels = ssd_predictions[eko_indices]
+    gt_label = gt_labels[label_name]
+
+    benchmark_results = {}
+    data_pack = evaluate_with_gt5(gt_label, eko_sample_labels, eko_mapping)
+    f1_score = data_pack['f1_score']
+    precision_score = data_pack['precision']
+    recall_score = data_pack['recall']
+    benchmark_results[query_name] = (f1_score, precision_score, recall_score)
+
+    Writer.write(f'eko_BEST_udf_{label_name}_{len(eko_indices)}', dataset_name, benchmark_results)
+
+def perform_benchmark_eko_vgg_silhouette_udf(images, gt_labels, ssd_predictions, dataset_name, query_name, number_of_samples, label_name):
+    from eva_storage.eko.silhouette import EKOSilhouette
+
+    method = EKOSilhouette()
+    eko_indices, eko_mapping = method.run(images)
+    eko_indices = np.array(eko_indices).astype(np.int)
+    eko_sample_labels = ssd_predictions[eko_indices]
+    gt_label = gt_labels[label_name]
+
+    benchmark_results = {}
+    data_pack = evaluate_with_gt5(gt_label, eko_sample_labels, eko_mapping)
+    f1_score = data_pack['f1_score']
+    precision_score = data_pack['precision']
+    recall_score = data_pack['recall']
+    benchmark_results[query_name] = (f1_score, precision_score, recall_score)
+
+    Writer.write(f'eko_BEST_udf_{label_name}_{len(eko_indices)}', dataset_name, benchmark_results)
 
 
 def perform_benchmark_jvc_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, label_name):
@@ -212,26 +234,6 @@ def perform_benchmark_jvc_pp(images, gt_labels, pp_predictions, dataset_name, qu
     Writer.write(f'jvc_pp_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
 
 
-def perform_benchmark_hierarchy_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, label_name):
-    preprocessor = Preprocessor()
-    preprocessor.run_debug(images, stopping_point = number_of_samples)
-    jvc_hierarchy, jvc_mapping = preprocessor.get_hierarchy_debug(stopping_point = number_of_samples)
-    assert(len(jvc_hierarchy) == number_of_samples)
-    assert(len(jvc_hierarchy) == max(jvc_mapping) + 1)
-
-    jvc_sample_labels = pp_predictions[jvc_hierarchy]
-
-    benchmark_results = {}
-
-    data_pack = evaluate_with_gt5(gt_labels, jvc_sample_labels, jvc_mapping)
-    f1_score = data_pack['f1_score']
-    precision_score = data_pack['precision']
-    recall_score = data_pack['recall']
-    benchmark_results[query_name] = (f1_score, precision_score, recall_score)
-
-    Writer.write(f'hierarchy_pp_{label_name}_{number_of_samples}', dataset_name, benchmark_results)
-
-
 def perform_benchmarks(dataset, ssd_predictions, pp_predictions, label_name, query_name, number_of_samples):
     """
     In this function, we load all the benchmarks we want to use for evaluation
@@ -246,18 +248,11 @@ def perform_benchmarks(dataset, ssd_predictions, pp_predictions, label_name, que
     """
     name, images, labels, boxes = dataset
     ## benchmark_functions
-    #perform_benchmark_udf(labels[label_name], ssd_predictions, name, query_name)
-    #perform_benchmark_pp(labels[label_name], pp_predictions, name, query_name)
-    perform_benchmark_us_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples, label_name)
-    perform_benchmark_noscope_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples, label_name)
-    perform_benchmark_jvc_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples, label_name)
-    perform_benchmark_hierarchy_pp(images, labels[label_name], pp_predictions, name, query_name, number_of_samples, label_name)
-
-
-
-
-
-
+    #perform_benchmark_tasti_udf(images, labels, ssd_predictions, name, query_name, number_of_samples, label_name)
+    #perform_benchmark_vgg16_eko_udf(images, labels, ssd_predictions, name, query_name, number_of_samples, label_name)
+    #perform_benchmark_eko_udf(images, labels, ssd_predictions, name, query_name, number_of_samples, label_name)
+    #perform_benchmark_eko_best_udf(images, labels, ssd_predictions, name, query_name, number_of_samples, label_name)
+    perform_benchmark_eko_vgg_silhouette_udf(images, labels, ssd_predictions, name, query_name, number_of_samples, label_name)
 
 if __name__ == "__main__":
 
@@ -298,9 +293,16 @@ if __name__ == "__main__":
             pp_loader = PPLoader(name, query)
             pp_predictions = pp_loader.predict(images) ## this is for specific query whereas ssd_predictions are not
             print(f"Done with pp predictions for {name} / {query}")
-            for number in number_of_samples:
-                perform_benchmarks(dataset, ssd_predictions[label], pp_predictions, label, query, number)
 
+            number = 0
+            curr_ssd_predictions = np.array(ssd_predictions[label])
+            perform_benchmarks(dataset, curr_ssd_predictions, pp_predictions, label, query, number)
+            ### we don't loop through number of samples for EKO best method so far
+            """
+            for number in number_of_samples:
+                curr_ssd_predictions = np.array(ssd_predictions[label])
+                perform_benchmarks(dataset, curr_ssd_predictions, pp_predictions, label, query, number)
+            """
         print(f"Done with benchmark predictions for {name}")
 
 

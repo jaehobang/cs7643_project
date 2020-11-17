@@ -36,9 +36,10 @@ class Timer:
 
 
 class Preprocessor:
-    def __init__(self):
-        self.cluster = TemporalClusterModule(downsample_method=DownSampleMeanMethod(),
-                                             sampling_method=FastMiddleEncounterMethod())
+    def __init__(self, vector_size = 100, downsample_method = DownSampleMeanMethod()):
+        self.cluster = TemporalClusterModule(downsample_method=downsample_method,
+                                             sampling_method=FastMiddleEncounterMethod(),
+                                             vector_size = vector_size)
         self.children = None
 
 

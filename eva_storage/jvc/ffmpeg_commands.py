@@ -93,6 +93,7 @@ class FfmpegCommands:
         return
 
 
+
     @staticmethod
     def force_keyframes(images, timestamps_list, save_directory, **kwargs):
         """

@@ -1,10 +1,12 @@
-
 from abc import ABC, abstractmethod
 import numpy as np
 import skimage.measure
 import torch
 import math
 import cv2
+
+from PIL import Image
+
 
 class FeatureExtractionMethod(ABC):
 
@@ -26,8 +28,7 @@ class VGG16Method(FeatureExtractionMethod):
 
         vgg16 = models.vgg16(pretrained = True)
         vgg16.cuda()
-        torch.set_default_tensor_type('torch.FloatTensor')
-        images_torch = torch.Tensor(images)
+        images_torch = torch.tensor(images, device = 'cpu').float()
         images_torch = images_torch.permute(0,3,1,2)
         data_loader = torch.utils.data.DataLoader(images_torch, batch_size = 32, shuffle = False)
         outputs = []
@@ -111,6 +112,35 @@ class BackgroundSubtractionMethod(FeatureExtractionMethod):
         return images_reshaped
 
 
+class DownSampleLanczosMethod(FeatureExtractionMethod):
+
+    def __init__(self):
+        self.name = 'LANCZOS'
+
+    def __str__(self):
+
+        return "Downsample the image by choosing max value in pixel blocks"
+
+
+    def run(self, images, desired_vector_size):
+        assert (desired_vector_size % 10 == 0)
+        wanted_width = 10
+        wanted_height = desired_vector_size // wanted_width
+
+        size = (wanted_height, wanted_width)
+        new_images_arr = np.ndarray(shape = (len(images), wanted_width, wanted_height, images.shape[3]))
+        for i in range(len(images)):
+            im = images[i]
+            pil_im = Image.fromarray(im, 'RGB')
+            pil_im = pil_im.resize(size, Image.LANCZOS)
+            new_images_arr[i] = np.array(pil_im, dtype = np.uint8)
+
+        ## now we have to reshape this
+        new_images_arr = np.mean(new_images_arr, axis = 3)
+        images_reshaped = new_images_arr.reshape(len(images), wanted_height * wanted_width)
+
+        return images_reshaped
+
 
 class DownSampleMaxMethod(FeatureExtractionMethod):
 
@@ -163,6 +193,8 @@ class DownSampleMeanMethod2(FeatureExtractionMethod):
 
 
 class DownSampleMeanMethod(FeatureExtractionMethod):
+    def __init__(self):
+        self.name = 'MEAN'
 
     def __str__(self):
         return "Downsample the image by avg pixel blocks"
@@ -190,6 +222,8 @@ class DownSampleMeanMethod(FeatureExtractionMethod):
 
 
 class DownSampleSkippingMethod(FeatureExtractionMethod):
+    def __init__(self):
+        self.name = 'SKIP'
 
     def __str__(self):
         return "Downsample the image by skipping pixels"
