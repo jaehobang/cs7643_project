@@ -212,7 +212,27 @@ def perform_benchmark_eko_vgg_silhouette_udf(images, gt_labels, ssd_predictions,
     recall_score = data_pack['recall']
     benchmark_results[query_name] = (f1_score, precision_score, recall_score)
 
-    Writer.write(f'eko_BEST_udf_{label_name}_{len(eko_indices)}', dataset_name, benchmark_results)
+    Writer.write(f'eko_SILHOUETTE_udf_{label_name}_{len(eko_indices)}', dataset_name, benchmark_results)
+
+
+def perform_benchmark_eko_vgg_backprop_udf(images, gt_labels, ssd_predictions, dataset_name, query_name, number_of_samples, label_name):
+    from eva_storage.eko.backprop import EKOBackprop
+
+    method = EKOBackprop()
+    eko_indices, eko_mapping = method.run(images)
+    eko_indices = np.array(eko_indices).astype(np.int)
+    eko_sample_labels = ssd_predictions[eko_indices]
+    gt_label = gt_labels[label_name]
+
+    benchmark_results = {}
+    data_pack = evaluate_with_gt5(gt_label, eko_sample_labels, eko_mapping)
+    f1_score = data_pack['f1_score']
+    precision_score = data_pack['precision']
+    recall_score = data_pack['recall']
+    benchmark_results[query_name] = (f1_score, precision_score, recall_score)
+
+    Writer.write(f'eko_SILHOUETTE_udf_{label_name}_{len(eko_indices)}', dataset_name, benchmark_results)
+
 
 
 def perform_benchmark_jvc_pp(images, gt_labels, pp_predictions, dataset_name, query_name, number_of_samples, label_name):

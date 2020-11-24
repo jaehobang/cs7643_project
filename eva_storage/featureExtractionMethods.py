@@ -4,8 +4,12 @@ import skimage.measure
 import torch
 import math
 import cv2
+import torchvision.models as models
 
 from PIL import Image
+import time
+import os
+import copy
 
 
 class FeatureExtractionMethod(ABC):
@@ -13,6 +17,160 @@ class FeatureExtractionMethod(ABC):
     @abstractmethod
     def run(self, images, desired_vector_size):
         pass
+
+
+class VGG16Method_train(FeatureExtractionMethod):
+
+    def __init__(self):
+        self.vgg16 = models.vgg16(pretrained = True)
+        self.vgg16.cuda()
+        self.curr_loss = -1
+
+    def preprocess_data(self, images):
+        pass
+
+    def __str__(self):
+        return "Extract the features using vgg16 network with training"
+
+    def save(self, save_directory):
+        save_file = os.path.join(save_directory, f'vgg16_loss_{self.curr_loss}')
+        torch.save(self.vgg16.state_dict(), save_file)
+        return
+
+    def train(self, dataloaders):
+        criterion = torch.nn.MSELoss()
+        optimizer = torch.optim.Adam(self.vgg16.features.parameters(), lr=0.0001)
+
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        num_epochs = 10
+
+        self.train_model(self.vgg16, dataloaders, criterion, optimizer, device=device, num_epochs=num_epochs)
+
+
+    def train_model(self, model, dataloaders, criterion, optimizer, device='cpu', num_epochs=25, is_inception=False):
+        ## TODO: update self.curr_loss -> this is used for
+        since = time.time()
+        val_acc_history = []
+
+        best_model_wts = copy.deepcopy(model.state_dict())
+        best_loss = 1000000
+
+        for epoch in range(num_epochs):
+            print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+            print('-' * 10)
+
+            # Each epoch has a training and validation phase
+            for phase in ['train', 'val']:
+                if phase == 'train':
+                    model.train()  # Set model to training mode
+                else:
+                    model.eval()  # Set model to evaluate mode
+
+                running_loss = 0.0
+                running_corrects = 0
+
+                # Iterate over data.
+                for inputs, labels in dataloaders[phase]:
+                    inputs = inputs.to(device)
+                    labels = labels.to(device)
+
+                    # zero the parameter gradients
+                    optimizer.zero_grad()
+
+                    # forward
+                    # track history if only in train
+                    with torch.set_grad_enabled(phase == 'train'):
+                        # Get model outputs and calculate loss
+                        # Special case for inception because in training it has an auxiliary output. In train
+                        #   mode we calculate the loss by summing the final output and the auxiliary output
+                        #   but in testing we only consider the final output.
+
+                        ##outputs = model(inputs)
+                        ## TODO: we don't use the classifier
+                        outputs = model.features(inputs)
+                        outputs = model.avgpool(outputs)
+
+                        #print(f"output shape: {outputs.size()}, labels shape: {labels.size()}")
+                        loss = criterion(outputs, labels)
+
+                        _, preds = torch.max(outputs, 1)
+
+                        # backward + optimize only if in training phase
+                        if phase == 'train':
+                            loss.backward()
+                            optimizer.step()
+
+                    # statistics
+                    running_loss += loss.item() * inputs.size(0)
+
+                epoch_loss = running_loss / len(dataloaders[phase].dataset)
+                self.curr_loss = epoch_loss
+
+                print('{} Loss: {:.4f} '.format(phase, epoch_loss))
+
+
+                # deep copy the model
+                if phase == 'val' and self.curr_loss < best_loss:
+                    best_loss = self.curr_loss
+                    best_model_wts = copy.deepcopy(model.state_dict())
+                if phase == 'val':
+                    val_acc_history.append(self.curr_loss)
+
+            print()
+
+        time_elapsed = time.time() - since
+        print('Training complete in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))
+        print('Best val Loss: {:4f}'.format(best_loss))
+
+        # load best model weights
+        model.load_state_dict(best_model_wts)
+        return model, val_acc_history
+
+
+
+
+    def run(self, images, desired_vector_size):
+
+        #import os
+        #os.environ["CUDA_VISIBLE_DEVICES"] = "1"  ## we want to run everything on gpu 1
+
+        vgg16 = models.vgg16(pretrained = True)
+        vgg16.cuda()
+        images_torch = torch.tensor(images, device = 'cpu').float()
+        images_torch = images_torch.permute(0,3,1,2)
+        data_loader = torch.utils.data.DataLoader(images_torch, batch_size = 32, shuffle = False)
+        outputs = []
+        features = []
+        for i, data_pack in enumerate(data_loader):
+            image_batch = data_pack
+            image_batch = image_batch.cuda()
+            ## TODO: add in adjustable average pool
+            output = vgg16.features(image_batch)
+            output = vgg16.avgpool(output)
+            output_sum = torch.sum(output, axis = 1)
+            output_sum = output_sum.cpu()
+            output_np = output_sum.detach().numpy() #n, 512, 9, 9
+
+            outputs.append( output_np )
+            features.append( output.cpu().detach().numpy() )
+
+
+        images_reshaped = np.concatenate(outputs, axis = 0)
+        self.image_features = np.concatenate(features, axis = 0)
+
+        images_reshaped = images_reshaped.reshape(images_reshaped.shape[0], images_reshaped.shape[1] * images_reshaped.shape[2])
+
+        if images_reshaped.shape[1] > desired_vector_size:
+            return images_reshaped[:,:desired_vector_size]
+
+        elif images_reshaped.shape[1] < desired_vector_size:
+            tmp = np.ndarray(shape = (images_reshaped.shape[0], desired_vector_size - images_reshaped.shape[1]))
+            images_reshaped = np.concatenate([images_reshaped, tmp], axis = 1)
+            return images_reshaped
+
+        else: ## images_reshaped.shape[1] == desired_vector_size
+            return images_reshaped
+
 
 
 

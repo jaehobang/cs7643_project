@@ -55,8 +55,22 @@ def udf_pipeline(file_descriptor):
     query_name = 'car=1'
     ssd_loader = SSDLoader()
     results = ssd_loader.predict(seattle_images, cuda = True)
-    file_descriptor.write(f"udf prediction loading time: {time.perturbojpf_counter() - st} (sec)\n")
+    file_descriptor.write(f"  NO SAMPLING TOTAL TIME: {time.perf_counter() - st} (sec)\n")
     return results
+
+def sample_pipeline(file_descriptor, num_samples):
+    st = time.perf_counter()
+    seattle_loader = SeattleLoader()
+    directory = '/nethome/jbang36/eva_jaeho/data/seattle/seattle2_100000.mp4'
+    seattle_images = seattle_loader.load_images(directory)
+    seattle_images = seattle_images[:num_samples]
+    file_descriptor.write(f"udf data loading time: {time.perf_counter() - st} (sec)\n")
+    ssd_loader = SSDLoader()
+    results = ssd_loader.predict(seattle_images, cuda = True)
+    file_descriptor.write(f"  SAMPLING TOTAL TIME for {num_samples} IMAGES: {time.perf_counter() - st} (sec)\n")
+
+
+
 
 def pp_pipeline(file_descriptor):
     st = time.perf_counter()
@@ -141,18 +155,21 @@ if __name__ == "__main__":
     1. Load the dataset
     2. """
     number_of_samples = [100,500,1000,5000]
-    base_directory = '/nethome/jbang36/eva_jaeho/data/benchmark_results/speed'
+    base_directory = '/nethome/jbang36/eva_jaeho/data/benchmark_results/cs7643'
     os.makedirs(base_directory, exist_ok = True)
 
-    save_directory = os.path.join('/nethome/jbang36/eva_jaeho/data/benchmark_results/speed', 'end2end_experiments.txt')
+    save_directory = os.path.join(base_directory, 'speed_sampling_vs_nosampling.txt')
     file_descriptor = open(save_directory, 'a+')
 
-    st = time.perf_counter()
-    udf_pipeline(file_descriptor)
-    file_descriptor.write(f"total time taken for udf is {time.perf_counter() - st} (seconds) \n")
-    st = time.perf_counter()
-    pp_pipeline(file_descriptor)
-    file_descriptor.write(f"total time taken for pp is {time.perf_counter() - st} (seconds) \n")
+    #st = time.perf_counter()
+    #udf_pipeline(file_descriptor)
+    #file_descriptor.write(f"total time taken for udf is {time.perf_counter() - st} (seconds) \n")
+    #st = time.perf_counter()
+    for number in [100, 500, 1000, 5000]:
+        sample_pipeline(file_descriptor, number)
+    #file_descriptor.write(f"total time taken for pp is {time.perf_counter() - st} (seconds) \n")
+
+
 
     """
     

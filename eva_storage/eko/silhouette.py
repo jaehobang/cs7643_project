@@ -47,6 +47,8 @@ class EKOSilhouette:
             cluster.fit(images_downsampled)
             labels = cluster.labels_
             scores.append( silhouette_score(images_downsampled, labels) )
+            if n % 1000 == 2:
+                print(f"Inside silhouette, current n is {n}")
 
         best_n = np.argmax(scores) * self.step_size
         cluster.n_clusters = best_n

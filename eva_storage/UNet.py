@@ -36,7 +36,7 @@ args = parser.parse_args()
 
 class UnetTransform:
     """
-        BaseTransofrm will perform the following operations:
+        BaseTransform will perform the following operations:
         1. Avg -- convert the image to grayscale
         2. Normalize -- arrange all pixel values to be between 0 and 1
         3. Resize -- resize the images to fit the network specifications
